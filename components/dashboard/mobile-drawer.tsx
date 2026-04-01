@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import SidebarNav from './sidebar-nav'
 import Link from 'next/link'
+import SignoutButton from './signout-button'
 
 export default function MobileDrawer({
   navItems,
@@ -60,12 +61,7 @@ export default function MobileDrawer({
               >
                 Home
               </Link>
-              <Link
-                href="/api/auth/signout"
-                className="flex-1 rounded-md border border-zinc-700 px-3 py-2 text-center text-sm text-zinc-200 hover:bg-zinc-900"
-              >
-                Sign out
-              </Link>
+              <SignoutButton className="flex-1 rounded-md border border-zinc-700 px-3 py-2 text-center text-sm text-zinc-200 hover:bg-zinc-900" />
             </div>
           </div>
         </div>

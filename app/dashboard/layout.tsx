@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import SidebarNav from '@/components/dashboard/sidebar-nav'
 import MobileDrawer from '@/components/dashboard/mobile-drawer'
+import SignoutButton from '@/components/dashboard/signout-button'
 import { normalizeRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 
@@ -84,12 +85,7 @@ export default async function DashboardLayout({
                   >
                     Home
                   </Link>
-                  <Link
-                    href="/api/auth/signout"
-                    className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-900"
-                  >
-                    Sign out
-                  </Link>
+                  <SignoutButton className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-900" />
                 </div>
               </div>
             </div>
