@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TAIZAN Athletics Web App
 
-## Getting Started
+Core MVP for role-based coaching operations:
+- Owner dashboard (admin view + session approvals)
+- Coach dashboard (session creation + athlete feedback)
+- Athlete dashboard (session viewing + booking + feedback)
+- Parent dashboard (linked athlete bookings + feedback)
 
-First, run the development server:
+## Tech Stack
+
+- Next.js App Router
+- Supabase Auth + Postgres
+- TypeScript
+
+## 1) Environment Variables
+
+Create `.env.local`:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 2) Database Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Open Supabase SQL Editor.
+2. Run `supabase/schema.sql`.
+3. Invite users from Supabase Auth.
+4. Ensure each user has a `profiles` row with role set to one of: `owner`, `coach`, `athlete`, `parent`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Example role update:
 
-## Learn More
+```sql
+update profiles
+set role = 'owner'
+where email = 'your@email.com';
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 3) Run Locally
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open `http://localhost:3000`.
 
-## Deploy on Vercel
+## 4) Current Implemented Flows
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Login via Supabase password auth at `/login`
+- Role-aware routing from `/dashboard`
+- Coach submits session (`pending` by default)
+- Owner approves/rejects pending sessions
+- Athlete books published sessions (tier/status gated)
+- Coach records athlete feedback
+- Parent sees linked athlete bookings and feedback
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 5) Next Recommended Steps
+
+- Add Google Sheets sync via Supabase Edge Function cron
+- Add Stripe checkout + webhook for subscription lifecycle
+- Add server-side validation and stricter auditing for all writes

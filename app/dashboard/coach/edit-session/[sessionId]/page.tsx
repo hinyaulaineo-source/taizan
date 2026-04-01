@@ -1,0 +1,68 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import EditSessionForm from './EditSessionForm'
+import Link from 'next/link'
+
+interface PageProps {
+  params: Promise<{ sessionId: string }>
+}
+
+export default async function EditSessionPage({ params }: PageProps) {
+  const { sessionId } = await params
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'coach' && profile?.role !== 'owner') redirect('/dashboard')
+
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('id, title, session_type, scheduled_at, location, allowed_tiers, max_athletes, status, created_by')
+    .eq('id', sessionId)
+    .single()
+
+  if (!session) redirect('/dashboard/coach')
+
+  // Let coach edit their own sessions (RLS should enforce, but UI should be clear)
+  if (profile?.role === 'coach' && session.created_by !== user.id) redirect('/dashboard/coach')
+
+  const { data: program } = await supabase
+    .from('programs')
+    .select('content_md')
+    .eq('session_id', sessionId)
+    .maybeSingle()
+
+  return (
+    <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '2rem' }}>
+        <Link href="/dashboard/coach" style={{ color: '#888', fontSize: '14px', textDecoration: 'none' }}>
+          ← Back
+        </Link>
+        <h1 style={{ fontSize: '22px', fontWeight: '500' }}>Edit session</h1>
+      </div>
+
+      <EditSessionForm
+        sessionId={session.id}
+        initial={{
+          title: session.title ?? '',
+          session_type: session.session_type ?? 'track_session',
+          scheduled_at: session.scheduled_at ? new Date(session.scheduled_at).toISOString().slice(0, 16) : '',
+          location: session.location ?? '',
+          allowed_tiers: (session.allowed_tiers ?? []) as string[],
+          program: (program as any)?.content_md ?? '',
+          max_athletes: session.max_athletes,
+        }}
+      />
+    </main>
+  )
+}
+

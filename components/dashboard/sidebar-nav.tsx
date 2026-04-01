@@ -1,0 +1,34 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+interface NavItem {
+  href: string
+  label: string
+}
+
+export default function SidebarNav({ items }: { items: NavItem[] }) {
+  const pathname = usePathname()
+
+  return (
+    <nav className="space-y-1">
+      {items.map((item) => {
+        const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={`block rounded-lg px-3 py-2 text-sm transition ${
+              active
+                ? 'bg-white text-black'
+                : 'text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100'
+            }`}
+          >
+            {item.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}

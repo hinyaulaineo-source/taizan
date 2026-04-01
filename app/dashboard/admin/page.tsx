@@ -1,5 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { isOwnerLike } from '@/lib/auth/roles'
 import { redirect } from 'next/navigation'
+import ApprovalButtons from './sessions/ApprovalButtons'
+import { Card, CardContent } from '@/components/ui/card'
+import LinkParentForm from './LinkParentForm'
+import SubscriptionManagerForm from './SubscriptionManagerForm'
+import SheetSyncForm from './SheetSyncForm'
+import CoachApprovalForm from './CoachApprovalForm'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -12,12 +19,14 @@ export default async function AdminDashboard() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'owner') redirect('/dashboard')
+  if (!isOwnerLike(profile?.role)) redirect('/dashboard')
 
   const { data: pendingSessions } = await supabase
     .from('sessions')
     .select('*')
     .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .order('scheduled_at', { ascending: true })
 
   const { data: athletes } = await supabase
     .from('profiles')
@@ -29,82 +38,151 @@ export default async function AdminDashboard() {
     .select('*')
     .eq('role', 'coach')
 
+  const { data: coachRequests } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, coach_requested_at')
+    .eq('coach_request_pending', true)
+    .order('coach_requested_at', { ascending: true })
+
+  const { data: parents } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .eq('role', 'parent')
+
+  const athleteIds = (athletes ?? []).map((a: any) => a.id)
+  const { data: subscriptions } = athleteIds.length > 0
+    ? await supabase
+        .from('subscriptions')
+        .select('user_id, tier, status')
+        .in('user_id', athleteIds)
+    : { data: [] as any[] }
+
+  const pendingSessionsByCreatedDate = (() => {
+    const groups = new Map<string, typeof pendingSessions>()
+    ;(pendingSessions ?? []).forEach((s) => {
+      const key = s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Unknown date'
+      const arr = groups.get(key) ?? []
+      arr.push(s)
+      groups.set(key, arr)
+    })
+    return Array.from(groups.entries())
+  })()
+
   return (
-    <main style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '22px', fontWeight: '500', marginBottom: '4px' }}>
-        TAIZAN Athletics
-      </h1>
-      <p style={{ color: '#888', fontSize: '14px', marginBottom: '2rem' }}>
-        Owner dashboard — The Basecamp
-      </p>
+    <main>
+      <h1 className="text-2xl font-semibold text-white">Owner Dashboard</h1>
+      <p className="mt-1 text-sm text-zinc-400">Approve sessions, monitor athletes, and run operations.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '2rem' }}>
-        <div style={{ padding: '1rem', background: '#111', border: '0.5px solid #222', borderRadius: '12px' }}>
-          <p style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>Pending sessions</p>
-          <p style={{ fontSize: '24px', fontWeight: '500' }}>{pendingSessions?.length ?? 0}</p>
-        </div>
-        <div style={{ padding: '1rem', background: '#111', border: '0.5px solid #222', borderRadius: '12px' }}>
-          <p style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>Athletes</p>
-          <p style={{ fontSize: '24px', fontWeight: '500' }}>{athletes?.length ?? 0}</p>
-        </div>
-        <div style={{ padding: '1rem', background: '#111', border: '0.5px solid #222', borderRadius: '12px' }}>
-          <p style={{ color: '#666', fontSize: '12px', marginBottom: '4px' }}>Coaches</p>
-          <p style={{ fontSize: '24px', fontWeight: '500' }}>{coaches?.length ?? 0}</p>
-        </div>
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <Card>
+          <CardContent>
+            <p className="text-xs text-zinc-500">Pending sessions</p>
+            <p className="mt-2 text-3xl font-semibold text-white">{pendingSessions?.length ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-xs text-zinc-500">Athletes</p>
+            <p className="mt-2 text-3xl font-semibold text-white">{athletes?.length ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="text-xs text-zinc-500">Coaches</p>
+            <p className="mt-2 text-3xl font-semibold text-white">{coaches?.length ?? 0}</p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>
-          Pending sessions awaiting approval
-        </h2>
+      <section className="mt-8">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Pending sessions awaiting approval</h2>
         {pendingSessions?.length === 0 && (
-          <p style={{ color: '#666', fontSize: '14px' }}>No pending sessions right now.</p>
+          <Card>
+            <CardContent>
+              <p className="text-sm text-zinc-500">No pending sessions right now.</p>
+            </CardContent>
+          </Card>
         )}
-        {pendingSessions?.map(session => (
-          <div key={session.id} style={{
-            padding: '1rem',
-            background: '#111',
-            border: '0.5px solid #222',
-            borderRadius: '12px',
-            marginBottom: '8px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <div>
-              <p style={{ fontWeight: '500', fontSize: '14px' }}>{session.title}</p>
-              <p style={{ color: '#666', fontSize: '12px' }}>{session.session_type} · {new Date(session.scheduled_at).toLocaleDateString()}</p>
-            </div>
-            <span style={{
-              background: '#1a1a00',
-              color: '#fbbf24',
-              fontSize: '11px',
-              padding: '3px 10px',
-              borderRadius: '20px',
-              border: '0.5px solid #333'
-            }}>Pending</span>
+        {pendingSessionsByCreatedDate.length > 0 && (
+          <div className="max-h-[500px] space-y-4 overflow-y-auto pr-1">
+            {pendingSessionsByCreatedDate.map(([createdDate, group]) => (
+              <div key={createdDate}>
+                <p className="mb-2 text-xs uppercase tracking-wide text-zinc-500">
+                  Created on {createdDate}
+                </p>
+                {group?.map((session) => (
+                  <Card key={session.id} className="mb-2">
+                    <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-100">{session.title}</p>
+                        <p className="text-xs text-zinc-500">
+                          {session.session_type} · {new Date(session.scheduled_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <ApprovalButtons sessionId={session.id} />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </section>
 
-      <div>
-        <h2 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>Athletes</h2>
+      <section className="mt-8">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Coach approval requests</h2>
+        <Card>
+          <CardContent className="p-6">
+            <CoachApprovalForm requests={coachRequests ?? []} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Athletes</h2>
         {athletes?.length === 0 && (
-          <p style={{ color: '#666', fontSize: '14px' }}>No athletes yet.</p>
+          <Card>
+            <CardContent>
+              <p className="text-sm text-zinc-500">No athletes yet.</p>
+            </CardContent>
+          </Card>
         )}
         {athletes?.map(athlete => (
-          <div key={athlete.id} style={{
-            padding: '1rem',
-            background: '#111',
-            border: '0.5px solid #222',
-            borderRadius: '12px',
-            marginBottom: '8px',
-          }}>
-            <p style={{ fontWeight: '500', fontSize: '14px' }}>{athlete.full_name ?? 'Unnamed'}</p>
-            <p style={{ color: '#666', fontSize: '12px' }}>{athlete.email}</p>
-          </div>
+          <Card key={athlete.id} className="mb-2">
+            <CardContent>
+              <p className="text-sm font-semibold text-zinc-100">{athlete.full_name ?? 'Unnamed'}</p>
+              <p className="text-xs text-zinc-500">{athlete.email}</p>
+            </CardContent>
+          </Card>
         ))}
-      </div>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Link parent to athlete</h2>
+        <Card>
+          <CardContent className="p-6">
+            <LinkParentForm parents={parents ?? []} athletes={athletes ?? []} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Sync athletes from Google Sheet</h2>
+        <Card>
+          <CardContent className="p-6">
+            <SheetSyncForm />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Manage subscriptions</h2>
+        <Card>
+          <CardContent className="p-6">
+            <SubscriptionManagerForm athletes={athletes ?? []} subscriptions={subscriptions ?? []} />
+          </CardContent>
+        </Card>
+      </section>
     </main>
   )
 }
