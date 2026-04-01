@@ -173,7 +173,7 @@ export default function EditSessionForm({
 
       <label style={labelStyle}>Available to tiers</label>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {['starter', 'performance', 'elite'].map((tier) => (
+        {['standard', 'performance', 'elite', 'youth_standard', 'youth_elite'].map((tier) => (
           <button
             key={tier}
             onClick={() => handleTierToggle(tier)}

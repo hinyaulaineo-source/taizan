@@ -11,6 +11,7 @@ export default function SubscriptionManagerForm({
   athletes: { id: string; full_name: string | null; email: string }[]
   subscriptions: { user_id: string; tier: string; status: string }[]
 }) {
+  type Tier = 'standard' | 'performance' | 'elite' | 'youth_standard' | 'youth_elite'
   const router = useRouter()
   const subscriptionByAthleteId = useMemo(() => {
     const m = new Map<string, { tier: string; status: string }>()
@@ -19,7 +20,7 @@ export default function SubscriptionManagerForm({
   }, [subscriptions])
 
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? '')
-  const [tier, setTier] = useState<'starter' | 'performance' | 'elite'>('starter')
+  const [tier, setTier] = useState<Tier>('standard')
   const [status, setStatus] = useState<'active' | 'inactive'>('active')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -35,8 +36,14 @@ export default function SubscriptionManagerForm({
             const nextId = e.target.value
             setAthleteId(nextId)
             const current = subscriptionByAthleteId.get(nextId)
-            if (current?.tier === 'starter' || current?.tier === 'performance' || current?.tier === 'elite') {
-              setTier(current.tier)
+            if (
+              current?.tier === 'standard' ||
+              current?.tier === 'performance' ||
+              current?.tier === 'elite' ||
+              current?.tier === 'youth_standard' ||
+              current?.tier === 'youth_elite'
+            ) {
+              setTier(current.tier as Tier)
             }
             if (current?.status === 'active' || current?.status === 'inactive') {
               setStatus(current.status)
@@ -60,9 +67,11 @@ export default function SubscriptionManagerForm({
             value={tier}
             onChange={(e) => setTier(e.target.value as any)}
           >
-            <option value="starter">starter</option>
+            <option value="standard">standard</option>
             <option value="performance">performance</option>
             <option value="elite">elite</option>
+            <option value="youth_standard">youth standard</option>
+            <option value="youth_elite">youth elite</option>
           </select>
         </div>
         <div>

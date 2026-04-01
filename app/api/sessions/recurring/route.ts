@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     start_at,
     end_date,
     location = '',
-    allowed_tiers = ['starter', 'performance', 'elite'],
+    allowed_tiers = ['standard', 'performance', 'elite', 'youth_standard', 'youth_elite'],
     weekdays,
     program = '',
     max_athletes,

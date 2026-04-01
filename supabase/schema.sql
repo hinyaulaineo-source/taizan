@@ -14,7 +14,7 @@ begin
   end if;
 
   if not exists (select 1 from pg_type where typname = 'subscription_tier') then
-    create type public.subscription_tier as enum ('starter', 'performance', 'elite');
+    create type public.subscription_tier as enum ('standard', 'performance', 'elite', 'youth_standard', 'youth_elite');
   end if;
 end $$;
 
@@ -34,7 +34,7 @@ create table if not exists public.profiles (
 create table if not exists public.subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
-  tier public.subscription_tier not null default 'starter',
+  tier public.subscription_tier not null default 'standard',
   status text not null default 'active',
   started_at timestamptz not null default now(),
   ends_at timestamptz,
@@ -50,7 +50,7 @@ create table if not exists public.sessions (
   session_type text not null default 'track_session',
   scheduled_at timestamptz not null,
   location text,
-  allowed_tiers public.subscription_tier[] not null default array['starter','performance','elite']::public.subscription_tier[],
+  allowed_tiers public.subscription_tier[] not null default array['standard','performance','elite','youth_standard','youth_elite']::public.subscription_tier[],
   max_athletes integer,
   status public.session_status not null default 'pending',
   created_by uuid not null references public.profiles(id) on delete cascade,

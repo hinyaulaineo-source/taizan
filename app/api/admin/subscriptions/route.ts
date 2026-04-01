@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
   const { athleteId, tier, status } = (await request.json()) as {
     athleteId?: string
-    tier?: 'starter' | 'performance' | 'elite' | string
+    tier?: 'standard' | 'performance' | 'elite' | 'youth_standard' | 'youth_elite' | string
     status?: 'active' | 'inactive' | string
   }
 
