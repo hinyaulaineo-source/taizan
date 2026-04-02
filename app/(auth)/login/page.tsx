@@ -40,7 +40,7 @@ export default function LoginPage() {
         borderRadius: '16px',
       }}>
         <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '500', marginBottom: '8px' }}>
-          TAIZAN Athletics
+          TrackZAN
         </h1>
         <p style={{ color: '#666', fontSize: '14px', marginBottom: '2rem' }}>
           The Basecamp. Sign in to continue.
@@ -72,7 +72,7 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="********"
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
             style={{
               width: '100%',

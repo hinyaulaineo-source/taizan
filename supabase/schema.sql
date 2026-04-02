@@ -1,4 +1,4 @@
--- TAIZAN Athletics MVP schema for Supabase
+-- TrackZAN MVP schema for Supabase
 -- Run in Supabase SQL editor.
 
 create extension if not exists "pgcrypto";
@@ -24,6 +24,7 @@ create table if not exists public.profiles (
   full_name text,
   avatar_url text,
   sheet_ref_no text,
+  main_events text[] not null default '{}'::text[],
   role public.user_role not null default 'athlete',
   coach_request_pending boolean not null default false,
   coach_requested_at timestamptz,
@@ -87,6 +88,18 @@ create table if not exists public.feedback (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.personal_bests (
+  id uuid primary key default gen_random_uuid(),
+  athlete_id uuid not null references public.profiles(id) on delete cascade,
+  metric text not null,
+  value numeric not null,
+  unit text not null default 's',
+  recorded_at timestamptz not null default now(),
+  note text,
+  created_by uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.parent_athlete_links (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid not null references public.profiles(id) on delete cascade,
@@ -101,6 +114,7 @@ alter table public.sessions enable row level security;
 alter table public.programs enable row level security;
 alter table public.bookings enable row level security;
 alter table public.feedback enable row level security;
+alter table public.personal_bests enable row level security;
 alter table public.parent_athlete_links enable row level security;
 
 -- Profiles
@@ -157,6 +171,16 @@ for insert with check (
 drop policy if exists "sessions update by owner or creator" on public.sessions;
 create policy "sessions update by owner or creator" on public.sessions
 for update using (
+  created_by = auth.uid() or
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'owner'
+  )
+);
+
+drop policy if exists "sessions delete by owner or creator" on public.sessions;
+create policy "sessions delete by owner or creator" on public.sessions
+for delete using (
   created_by = auth.uid() or
   exists (
     select 1 from public.profiles p
@@ -271,6 +295,25 @@ with check (
   )
 );
 
+drop policy if exists "bookings delete by athlete parent or privileged" on public.bookings;
+create policy "bookings delete by athlete parent or privileged" on public.bookings
+for delete using (
+  athlete_id = auth.uid() or
+  exists (
+    select 1
+    from public.parent_athlete_links l
+    where l.parent_id = auth.uid()
+      and l.athlete_id = public.bookings.athlete_id
+  ) or
+  exists (
+    select 1
+    from public.sessions s
+    join public.profiles p on p.id = auth.uid()
+    where s.id = public.bookings.session_id
+      and (p.role = 'owner' or s.created_by = auth.uid())
+  )
+);
+
 -- Feedback
 drop policy if exists "feedback read own parent or privileged" on public.feedback;
 create policy "feedback read own parent or privileged" on public.feedback
@@ -290,6 +333,66 @@ drop policy if exists "feedback create by coach or owner" on public.feedback;
 create policy "feedback create by coach or owner" on public.feedback
 for insert with check (
   coach_id = auth.uid() and
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('owner', 'coach')
+  )
+);
+
+drop policy if exists "feedback delete by coach or owner" on public.feedback;
+create policy "feedback delete by coach or owner" on public.feedback
+for delete using (
+  coach_id = auth.uid() or
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'owner'
+  )
+);
+
+-- Personal bests
+drop policy if exists "personal bests read own parent or privileged" on public.personal_bests;
+create policy "personal bests read own parent or privileged" on public.personal_bests
+for select using (
+  athlete_id = auth.uid() or
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('owner', 'coach')
+  ) or
+  exists (
+    select 1 from public.parent_athlete_links l
+    where l.parent_id = auth.uid() and l.athlete_id = personal_bests.athlete_id
+  )
+);
+
+drop policy if exists "personal bests insert own or privileged" on public.personal_bests;
+create policy "personal bests insert own or privileged" on public.personal_bests
+for insert with check (
+  (
+    athlete_id = auth.uid() and created_by = auth.uid()
+  ) or
+  (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role in ('owner', 'coach')
+    ) and created_by = auth.uid()
+  )
+);
+
+drop policy if exists "personal bests update own or privileged" on public.personal_bests;
+create policy "personal bests update own or privileged" on public.personal_bests
+for update using (
+  (
+    athlete_id = auth.uid() and created_by = auth.uid()
+  ) or
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('owner', 'coach')
+  )
+)
+with check (
+  (
+    athlete_id = auth.uid() and created_by = auth.uid()
+  ) or
   exists (
     select 1 from public.profiles p
     where p.id = auth.uid() and p.role in ('owner', 'coach')

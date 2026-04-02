@@ -13,7 +13,7 @@ export default async function AthleteProfilePage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name, avatar_url')
+    .select('role, full_name, avatar_url, main_events')
     .eq('id', user.id)
     .single()
 
@@ -36,6 +36,7 @@ export default async function AthleteProfilePage() {
         <AthleteProfileForm
           initialFullName={profile?.full_name ?? null}
           initialAvatarUrl={profile?.avatar_url ?? null}
+          initialMainEvents={(profile?.main_events as string[] | null) ?? []}
         />
       </div>
     </main>

@@ -17,6 +17,14 @@ interface Session {
 }
 
 export default function FeedbackForm({ athletes, sessions }: { athletes: Athlete[]; sessions: Session[] }) {
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      timeZone: 'UTC',
+    }).format(new Date(value))
+
   const router = useRouter()
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? '')
   const [sessionId, setSessionId] = useState('')
@@ -84,7 +92,7 @@ export default function FeedbackForm({ athletes, sessions }: { athletes: Athlete
         <option value="">General feedback</option>
         {sessions.map((session) => (
           <option key={session.id} value={session.id}>
-            {session.title} ({new Date(session.scheduled_at).toLocaleDateString()})
+            {session.title} ({formatDate(session.scheduled_at)})
           </option>
         ))}
       </select>

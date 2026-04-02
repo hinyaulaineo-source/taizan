@@ -5,10 +5,12 @@ import Link from 'next/link'
 
 interface PageProps {
   params: Promise<{ sessionId: string }>
+  searchParams: Promise<{ batch?: string }>
 }
 
-export default async function EditSessionPage({ params }: PageProps) {
+export default async function EditSessionPage({ params, searchParams }: PageProps) {
   const { sessionId } = await params
+  const { batch } = await searchParams
 
   const supabase = await createClient()
   const {
@@ -26,7 +28,7 @@ export default async function EditSessionPage({ params }: PageProps) {
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('id, title, session_type, scheduled_at, location, allowed_tiers, max_athletes, status, created_by')
+    .select('id, title, session_type, scheduled_at, location, allowed_tiers, max_athletes, status, created_by, created_at')
     .eq('id', sessionId)
     .single()
 
@@ -53,6 +55,7 @@ export default async function EditSessionPage({ params }: PageProps) {
       <EditSessionForm
         sessionId={session.id}
         initial={{
+          id: session.id,
           title: session.title ?? '',
           session_type: session.session_type ?? 'track_session',
           scheduled_at: session.scheduled_at ? new Date(session.scheduled_at).toISOString().slice(0, 16) : '',
@@ -60,7 +63,10 @@ export default async function EditSessionPage({ params }: PageProps) {
           allowed_tiers: (session.allowed_tiers ?? []) as string[],
           program: (program as any)?.content_md ?? '',
           max_athletes: session.max_athletes,
+          created_at: session.created_at,
+          created_by: session.created_by,
         }}
+        initialApplyToBatch={batch === '1'}
       />
     </main>
   )

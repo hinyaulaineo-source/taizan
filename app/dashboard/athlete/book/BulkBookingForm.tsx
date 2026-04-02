@@ -20,6 +20,31 @@ export default function BulkBookingForm({ sessions }: { sessions: SessionOption[
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      timeZone: 'UTC',
+    }).format(new Date(value))
+
+  const formatWeekday = (value: string) =>
+    new Intl.DateTimeFormat('en-GB', {
+      weekday: 'long',
+      timeZone: 'UTC',
+    }).format(new Date(value))
+
+  const formatDateTime = (value: string) =>
+    new Intl.DateTimeFormat('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC',
+    }).format(new Date(value))
+
   const calendarEvents = useMemo<CalendarEvent[]>(() => {
     const dateKeyFromScheduledAt = (scheduledAt: string) => {
       const d = new Date(scheduledAt)
@@ -40,7 +65,7 @@ export default function BulkBookingForm({ sessions }: { sessions: SessionOption[
   const sessionsByCreatedDate = useMemo(() => {
     const groups = new Map<string, SessionOption[]>()
     sessions.forEach((s) => {
-      const key = s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Unknown date'
+      const key = s.created_at ? formatDate(s.created_at) : 'Unknown date'
       const arr = groups.get(key) ?? []
       arr.push(s)
       groups.set(key, arr)
@@ -95,12 +120,11 @@ export default function BulkBookingForm({ sessions }: { sessions: SessionOption[
                       <div>
                         <p className="text-sm font-semibold text-zinc-100">{s.title}</p>
                         {(() => {
-                          const dt = new Date(s.scheduled_at)
-                          const weekday = dt.toLocaleDateString(undefined, { weekday: 'long' })
+                          const weekday = formatWeekday(s.scheduled_at)
                           return <p className="text-xs text-zinc-400">{weekday}</p>
                         })()}
                         <p className="text-xs text-zinc-500">
-                          {new Date(s.scheduled_at).toLocaleString()}
+                          {formatDateTime(s.scheduled_at)}
                           {s.location ? ` · ${s.location}` : ''}
                         </p>
                       </div>

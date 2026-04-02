@@ -24,7 +24,7 @@ export default async function DashboardLayout({
     .single()
 
   const role = normalizeRole(profile?.role) ?? 'athlete'
-  const displayName = profile?.full_name || user.email || 'TAIZAN User'
+  const displayName = profile?.full_name || user.email || 'TrackZAN User'
 
   const itemsByRole: Record<string, { href: string; label: string }[]> = {
     owner: [
@@ -48,19 +48,19 @@ export default async function DashboardLayout({
   const navItems = itemsByRole[role] ?? itemsByRole.athlete
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-7xl">
-        <aside className="hidden min-h-screen w-72 border-r border-zinc-800 bg-zinc-950/80 px-4 py-5 md:block">
-          <p className="text-xs uppercase tracking-widest text-zinc-500">TAIZAN Athletics</p>
-          <h2 className="mt-2 text-lg font-semibold text-white">The Basecamp</h2>
-          <p className="mt-1 text-sm text-zinc-400">{role}</p>
+        <aside className="hidden min-h-screen w-72 border-r border-border bg-card/80 px-4 py-5 md:block">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">TrackZAN</p>
+          <h2 className="mt-2 text-lg font-semibold text-foreground">The Basecamp</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{role}</p>
           <div className="mt-6">
             <SidebarNav items={navItems} />
           </div>
         </aside>
 
         <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-0 z-10 border-b border-zinc-800 bg-black/80 px-4 py-3 backdrop-blur md:px-8">
+          <header className="sticky top-0 z-10 border-b border-border bg-background/80 px-4 py-3 backdrop-blur md:px-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {profile?.avatar_url ? (
@@ -68,12 +68,12 @@ export default async function DashboardLayout({
                   <img
                     src={profile.avatar_url}
                     alt=""
-                    className="hidden h-10 w-10 shrink-0 rounded-full border border-zinc-700 object-cover sm:block"
+                    className="hidden h-10 w-10 shrink-0 rounded-full border border-border object-cover sm:block"
                   />
                 ) : null}
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-zinc-500">Signed in as</p>
-                  <p className="text-sm font-medium text-zinc-200">{displayName}</p>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Signed in as</p>
+                  <p className="text-sm font-medium text-foreground">{displayName}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -81,11 +81,11 @@ export default async function DashboardLayout({
                 <div className="hidden items-center gap-2 md:flex">
                   <Link
                     href="/dashboard"
-                    className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-900"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-accent"
                   >
                     Home
                   </Link>
-                  <SignoutButton className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-zinc-900" />
+                  <SignoutButton className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-accent" />
                 </div>
               </div>
             </div>

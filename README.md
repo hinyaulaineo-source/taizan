@@ -1,4 +1,4 @@
-# TAIZAN Athletics Web App
+# TrackZAN Web App
 
 Core MVP for role-based coaching operations:
 - Owner dashboard (admin view + session approvals)

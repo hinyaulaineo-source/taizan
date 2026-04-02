@@ -12,9 +12,10 @@ export async function PATCH(request: Request) {
   const body = (await request.json()) as {
     full_name?: string | null
     avatar_url?: string | null
+    main_events?: string[] | null
   }
 
-  const updates: Record<string, string | null> = {}
+  const updates: Record<string, string | string[] | null> = {}
 
   if ('full_name' in body) {
     const v = body.full_name
@@ -28,6 +29,18 @@ export async function PATCH(request: Request) {
       v === null || v === undefined ? null : typeof v === 'string' ? v.trim() || null : null
   }
 
+  if ('main_events' in body) {
+    const v = body.main_events
+    if (Array.isArray(v)) {
+      updates.main_events = v
+        .map((e) => (typeof e === 'string' ? e.trim() : ''))
+        .filter((e) => e.length > 0)
+        .slice(0, 12)
+    } else {
+      updates.main_events = []
+    }
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 })
   }
@@ -36,7 +49,7 @@ export async function PATCH(request: Request) {
     .from('profiles')
     .update(updates)
     .eq('id', user.id)
-    .select('id, full_name, avatar_url, email')
+    .select('id, full_name, avatar_url, main_events, email')
     .single()
 
   if (error) {

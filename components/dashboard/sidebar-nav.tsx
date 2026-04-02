@@ -21,8 +21,8 @@ export default function SidebarNav({ items }: { items: NavItem[] }) {
             href={item.href}
             className={`block rounded-lg px-3 py-2 text-sm transition ${
               active
-                ? 'bg-white text-black'
-                : 'text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
             {item.label}

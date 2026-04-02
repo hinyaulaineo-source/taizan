@@ -19,7 +19,7 @@ export default function Home() {
           background: '#111',
         }}
       >
-        <p style={{ color: '#888', fontSize: '13px', marginBottom: '10px' }}>TAIZAN Athletics</p>
+        <p style={{ color: '#888', fontSize: '13px', marginBottom: '10px' }}>TrackZAN</p>
         <h1 style={{ fontSize: '32px', marginBottom: '8px', fontWeight: 600, color: '#fff' }}>
           The Basecamp for Speed Lab training
         </h1>

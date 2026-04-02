@@ -12,6 +12,17 @@ type CoachRequest = {
 }
 
 export default function CoachApprovalForm({ requests }: { requests: CoachRequest[] }) {
+  const formatDateTime = (value: string) =>
+    new Intl.DateTimeFormat('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC',
+    }).format(new Date(value))
+
   const router = useRouter()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -50,7 +61,7 @@ export default function CoachApprovalForm({ requests }: { requests: CoachRequest
             <p className="text-xs text-zinc-500">{r.email}</p>
             {r.coach_requested_at && (
               <p className="mt-1 text-xs text-zinc-500">
-                Requested: {new Date(r.coach_requested_at).toLocaleString()}
+                Requested: {formatDateTime(r.coach_requested_at)}
               </p>
             )}
           </div>

@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { WorkoutProgressBar, WorkoutProgressRing } from '@/components/ui/workout-progress'
+import { Calendar, type CalendarEvent } from '@/components/ui/calendar'
 
 export default async function CoachDashboard() {
   const supabase = await createClient()
@@ -63,28 +65,28 @@ export default async function CoachDashboard() {
 
   return (
     <main>
-      <h1 className="text-2xl font-semibold text-white">Coach Dashboard</h1>
-      <p className="mt-1 text-sm text-zinc-400">Welcome, {profile?.full_name ?? user.email}</p>
+      <h1 className="text-2xl font-semibold text-foreground">Coach Dashboard</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Welcome, {profile?.full_name ?? user.email}</p>
 
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         <Card>
           <CardContent>
-            <p className="text-xs text-zinc-500">My sessions</p>
-            <p className="mt-2 text-3xl font-semibold text-white">{sessions?.length ?? 0}</p>
+            <p className="text-xs text-muted-foreground">My sessions</p>
+            <p className="mt-2 text-3xl font-semibold text-foreground">{sessions?.length ?? 0}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent>
-            <p className="text-xs text-zinc-500">Pending approval</p>
-            <p className="mt-2 text-3xl font-semibold text-white">
+            <p className="text-xs text-muted-foreground">Pending approval</p>
+            <p className="mt-2 text-3xl font-semibold text-foreground">
               {sessions?.filter((s) => s.status === 'pending').length ?? 0}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent>
-            <p className="text-xs text-zinc-500">Published</p>
-            <p className="mt-2 text-3xl font-semibold text-white">
+            <p className="text-xs text-muted-foreground">Published</p>
+            <p className="mt-2 text-3xl font-semibold text-foreground">
               {sessions?.filter((s) => s.status === 'published').length ?? 0}
             </p>
           </CardContent>
@@ -92,18 +94,45 @@ export default async function CoachDashboard() {
       </div>
 
       <section className="mt-8">
+        <h2 className="mb-3 text-base font-semibold text-foreground">Master calendar</h2>
+        <Calendar
+          events={(() => {
+            const dateKeyFromScheduledAt = (scheduledAt: string) => {
+              const d = new Date(scheduledAt)
+              const yyyy = d.getFullYear()
+              const mm = String(d.getMonth() + 1).padStart(2, '0')
+              const dd = String(d.getDate()).padStart(2, '0')
+              return `${yyyy}-${mm}-${dd}`
+            }
+
+            return (sessions ?? []).map(
+              (s): CalendarEvent => ({
+                dateKey: dateKeyFromScheduledAt(s.scheduled_at),
+                sessionId: s.id,
+                title: `${s.title} (${s.status})`,
+                isBooked: s.status === 'published',
+                canBook: false,
+              }),
+            )
+          })()}
+          bookingLink="/dashboard/coach/new-session"
+          initialMonth={new Date()}
+        />
+      </section>
+
+      <section className="mt-8">
         <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-base font-semibold text-zinc-100">My sessions</h2>
+          <h2 className="text-base font-semibold text-foreground">My sessions</h2>
           <div className="flex gap-2">
             <Link
               href="/dashboard/coach/feedback"
-              className="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+              className="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-accent"
             >
               + Add feedback
             </Link>
             <Link
               href="/dashboard/coach/new-session"
-              className="rounded-md bg-white px-3 py-2 text-sm font-medium text-black hover:bg-zinc-200"
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
             >
               + New session
             </Link>
@@ -113,7 +142,7 @@ export default async function CoachDashboard() {
         {sessions?.length === 0 && (
           <Card>
             <CardContent>
-              <p className="text-sm text-zinc-500">No sessions yet. Create your first one.</p>
+              <p className="text-sm text-muted-foreground">No sessions yet. Create your first one.</p>
             </CardContent>
           </Card>
         )}
@@ -122,16 +151,26 @@ export default async function CoachDashboard() {
           <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1">
             {sessionsByCreatedDate.map(([createdDate, group]) => (
               <div key={createdDate}>
-                <p className="mb-2 text-xs uppercase tracking-wide text-zinc-500">
-                  Created on {createdDate}
-                </p>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Created on {createdDate}
+                  </p>
+                  {group && group.length > 0 ? (
+                    <Link
+                      href={`/dashboard/coach/edit-session/${group[0].id}?batch=1`}
+                      className="rounded-md border border-border px-2.5 py-1 text-[11px] text-foreground hover:bg-accent"
+                    >
+                      Edit batch
+                    </Link>
+                  ) : null}
+                </div>
                 {group?.map((session) => (
                   <Card key={session.id} className="mb-2">
                     <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-zinc-100">{session.title}</p>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {session.session_type} · {new Date(session.scheduled_at).toLocaleDateString()}
+                        <p className="text-sm font-semibold text-foreground">{session.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {session.session_type} · {new Date(session.scheduled_at).toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -148,7 +187,7 @@ export default async function CoachDashboard() {
                         </Badge>
                         <Link
                           href={`/dashboard/coach/edit-session/${session.id}`}
-                          className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-900"
+                          className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent"
                         >
                           Edit
                         </Link>
@@ -163,11 +202,11 @@ export default async function CoachDashboard() {
       </section>
 
       <section className="mt-10">
-        <h2 className="mb-3 text-base font-semibold text-zinc-100">My roster</h2>
+        <h2 className="mb-3 text-base font-semibold text-foreground">My roster</h2>
         {roster.length === 0 ? (
           <Card>
             <CardContent>
-              <p className="text-sm text-zinc-500">No athlete feedback saved yet.</p>
+              <p className="text-sm text-muted-foreground">No athlete feedback saved yet.</p>
             </CardContent>
           </Card>
         ) : (
@@ -176,12 +215,16 @@ export default async function CoachDashboard() {
               <Card key={a.athlete_id}>
                 <CardContent className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-zinc-100">{a.full_name ?? 'Unnamed'}</p>
-                    <p className="text-xs text-zinc-500">{a.email}</p>
+                    <p className="text-sm font-semibold text-foreground">{a.full_name ?? 'Unnamed'}</p>
+                    <p className="text-xs text-muted-foreground">{a.email}</p>
+                    <div className="mt-2 w-48">
+                      <WorkoutProgressBar value={60} />
+                    </div>
                   </div>
-                  <Badge tone="neutral">
-                    Last: {new Date(a.last_created_at).toLocaleDateString()}
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <WorkoutProgressRing value={60} />
+                    <Badge tone="neutral">Last: {new Date(a.last_created_at).toLocaleDateString()}</Badge>
+                  </div>
                 </CardContent>
               </Card>
             ))}

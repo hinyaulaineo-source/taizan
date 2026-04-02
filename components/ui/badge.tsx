@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 type BadgeTone = 'neutral' | 'success' | 'warning'
 
 const toneMap: Record<BadgeTone, string> = {
-  neutral: 'border-zinc-700 bg-zinc-900 text-zinc-300',
+  neutral: 'border-border bg-muted text-foreground',
   success: 'border-emerald-700/60 bg-emerald-950 text-emerald-300',
   warning: 'border-amber-700/60 bg-amber-950 text-amber-300',
 }

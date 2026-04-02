@@ -10,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { Calendar, type CalendarEvent } from '@/components/ui/calendar'
+import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
 
 export default async function ParentDashboard() {
   const supabase = await createClient()
@@ -67,8 +68,10 @@ export default async function ParentDashboard() {
           .order('scheduled_at', { ascending: true })
       : { data: [] }
 
+  const firstPublished = (availableSessions ?? [])[0] as any
+
   return (
-    <main>
+    <main className="pb-20 md:pb-0">
       {ownerPreview && (
         <div className="mb-6 rounded-lg border border-amber-900/80 bg-amber-950/40 px-4 py-3 text-sm text-amber-100/90">
           You’re viewing the parent dashboard as an owner. Linked athletes and booking actions appear
@@ -77,18 +80,18 @@ export default async function ParentDashboard() {
       )}
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Parent Dashboard</h1>
-          <p className="mt-1 text-sm text-zinc-400">Welcome, {profile?.full_name ?? user.email}</p>
+          <h1 className="text-2xl font-semibold text-foreground">Parent Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Welcome, {profile?.full_name ?? user.email}</p>
         </div>
         <Badge tone="neutral">{ownerPreview ? 'Owner preview' : 'Parent'}</Badge>
       </div>
 
       <section className="mb-10">
-        <h2 className="mb-3 text-base font-semibold text-zinc-100">Your athletes</h2>
+        <h2 className="mb-3 text-base font-semibold text-foreground">Your athletes</h2>
         {links?.length === 0 && (
           <Card>
             <CardContent>
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-muted-foreground">
                 {ownerPreview
                   ? 'Parent accounts see athletes the owner has linked to them here.'
                   : 'No athletes linked yet. Contact the owner to link your athlete account.'}
@@ -100,12 +103,12 @@ export default async function ParentDashboard() {
         {links?.map((link) => (
           <Card key={link.athlete_id} className="mb-3">
             <CardContent className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-sm font-medium text-zinc-400">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
                 {(link.profiles as any)?.full_name?.charAt(0) ?? '?'}
               </div>
               <div>
-                <p className="text-sm font-semibold text-zinc-100">{(link.profiles as any)?.full_name ?? 'Unnamed'}</p>
-                <p className="mt-1 text-xs text-zinc-500">{(link.profiles as any)?.email}</p>
+                <p className="text-sm font-semibold text-foreground">{(link.profiles as any)?.full_name ?? 'Unnamed'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{(link.profiles as any)?.email}</p>
               </div>
             </CardContent>
           </Card>
@@ -113,25 +116,25 @@ export default async function ParentDashboard() {
       </section>
 
       <section className="mb-10">
-        <h2 className="mb-3 text-base font-semibold text-zinc-100">Calendar</h2>
+        <h2 className="mb-3 text-base font-semibold text-foreground">Calendar</h2>
         {athleteIds.length === 0 && !ownerPreview && (
           <Card>
             <CardContent>
-              <p className="text-sm text-zinc-500">No athletes linked yet.</p>
+              <p className="text-sm text-muted-foreground">No athletes linked yet.</p>
             </CardContent>
           </Card>
         )}
         {ownerPreview && athleteIds.length === 0 && (availableSessions?.length ?? 0) > 0 && (
           <Card className="mb-4">
             <CardContent>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Published sessions (preview)
               </p>
-              <ul className="space-y-2 text-sm text-zinc-300">
+              <ul className="space-y-2 text-sm text-foreground">
                 {(availableSessions ?? []).slice(0, 8).map((s: any) => (
                   <li key={s.id}>
                     {s.title}{' '}
-                    <span className="text-zinc-500">
+                    <span className="text-muted-foreground">
                       · {new Date(s.scheduled_at).toLocaleString()}
                     </span>
                   </li>
@@ -230,29 +233,48 @@ export default async function ParentDashboard() {
         />
       </section>
 
+      <section className="mb-10">
+        <div className="glass-panel min-h-[190px] p-5">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Today</p>
+          <h2 className="mt-2 text-2xl font-bold text-foreground">Today's Session</h2>
+          {firstPublished ? (
+            <p className="mt-2 text-sm text-foreground">
+              {firstPublished.title} · {new Date(firstPublished.scheduled_at).toLocaleString()}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">No published sessions yet.</p>
+          )}
+        </div>
+      </section>
+
       <section>
-        <h2 className="mb-3 text-base font-semibold text-zinc-100">Coach feedback</h2>
+        <h2 className="mb-3 text-base font-semibold text-foreground">Coach feedback</h2>
         {feedback?.length === 0 && (
           <Card>
             <CardContent>
-              <p className="text-sm text-zinc-500">No feedback yet.</p>
+              <p className="text-sm text-muted-foreground">No feedback yet.</p>
             </CardContent>
           </Card>
         )}
-        {feedback?.map((f: any) => (
-          <Card key={f.id} className="mb-3">
-            <CardContent>
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <p className="text-xs text-zinc-500">
-                  {f.sessions?.title} · {new Date(f.created_at).toLocaleDateString()}
-                </p>
-                <p className="text-xs text-zinc-400">{f.profiles?.full_name}</p>
-              </div>
-              <p className="text-sm leading-6 text-zinc-100">{f.content}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <div className="space-y-2">
+          {feedback?.map((f: any, idx: number) => (
+            <div
+              key={f.id}
+              className={`max-w-[88%] rounded-2xl px-3 py-2 text-sm ${
+                idx % 2 === 0
+                  ? 'bg-accent text-accent-foreground'
+                  : 'ml-auto bg-primary text-primary-foreground'
+              }`}
+            >
+              <p className="mb-1 text-[11px] text-muted-foreground">
+                {f.sessions?.title} · {new Date(f.created_at).toLocaleDateString()}
+              </p>
+              <p>{f.content}</p>
+            </div>
+          ))}
+        </div>
       </section>
+      <MobileBottomNav />
     </main>
   )
 }

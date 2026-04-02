@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'TAIZAN Athletics',
+  title: 'TrackZAN',
   description: 'The Basecamp for athletes, parents, and coaches.',
 }
 

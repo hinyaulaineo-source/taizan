@@ -92,7 +92,7 @@ export default function SignupPage() {
         }}
       >
         <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '500', marginBottom: '8px' }}>
-          TAIZAN Athletics
+          TrackZAN
         </h1>
         <p style={{ color: '#666', fontSize: '14px', marginBottom: '2rem' }}>
           Create your account to book sessions.
@@ -171,7 +171,7 @@ export default function SignupPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="********"
             onKeyDown={(e) => e.key === 'Enter' && handleSignup()}
             style={{
               width: '100%',
