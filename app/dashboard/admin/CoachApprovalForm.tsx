@@ -75,8 +75,9 @@ export default function CoachApprovalForm({ requests }: { requests: CoachRequest
           <div className="flex gap-2">
             <Button
               onClick={() => run(r.id, 'approve')}
+              variant="outline"
               disabled={busyId === r.id}
-              className="bg-white text-black hover:bg-zinc-200"
+              className="bg-white text-black hover:bg-zinc-200 border border-border"
             >
               Approve coach
             </Button>
