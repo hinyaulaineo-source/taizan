@@ -30,19 +30,26 @@ export default function CoachApprovalForm({ requests }: { requests: CoachRequest
   async function run(profileId: string, action: 'approve' | 'reject') {
     setBusyId(profileId)
     setError('')
-    const response = await fetch('/api/admin/coach-requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profileId, action }),
-    })
-    if (!response.ok) {
-      const data = (await response.json().catch(() => null)) as { error?: string } | null
-      setError(data?.error ?? 'Failed to update coach request.')
+    try {
+      const response = await fetch('/api/admin/coach-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, action }),
+      })
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null
+        setError(data?.error ?? 'Failed to update coach request.')
+        setBusyId(null)
+        return
+      }
+
       setBusyId(null)
-      return
+      router.refresh()
+    } catch (e) {
+      setError('Network error. Please try again.')
+      setBusyId(null)
     }
-    setBusyId(null)
-    router.refresh()
   }
 
   if (requests.length === 0) {

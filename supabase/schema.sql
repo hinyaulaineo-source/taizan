@@ -142,6 +142,16 @@ for update using (
   )
 );
 
+-- Profiles delete
+drop policy if exists "profiles delete by owner" on public.profiles;
+create policy "profiles delete by owner" on public.profiles
+for delete using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role = 'owner'
+  )
+);
+
 -- Sessions
 drop policy if exists "sessions read by role and status" on public.sessions;
 create policy "sessions read by role and status" on public.sessions

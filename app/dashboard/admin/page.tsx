@@ -7,6 +7,7 @@ import LinkParentForm from './LinkParentForm'
 import SubscriptionManagerForm from './SubscriptionManagerForm'
 import SheetSyncForm from './SheetSyncForm'
 import CoachApprovalForm from './CoachApprovalForm'
+import AccountManager from './AccountManager'
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
@@ -48,6 +49,11 @@ export default async function AdminDashboard() {
     .from('profiles')
     .select('id, full_name, email')
     .eq('role', 'parent')
+
+  const { data: accounts } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role, coach_request_pending')
+    .neq('role', 'owner')
 
   const athleteIds = (athletes ?? []).map((a: any) => a.id)
   const { data: subscriptions } = athleteIds.length > 0
@@ -155,6 +161,15 @@ export default async function AdminDashboard() {
             </CardContent>
           </Card>
         ))}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Manage accounts</h2>
+        <Card>
+          <CardContent className="p-6">
+            <AccountManager profiles={accounts ?? []} />
+          </CardContent>
+        </Card>
       </section>
 
       <section className="mt-10">
