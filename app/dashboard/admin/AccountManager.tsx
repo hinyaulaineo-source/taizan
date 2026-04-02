@@ -43,7 +43,7 @@ export default function AccountManager({ profiles }: { profiles: ProfileRow[] })
       })
       const data = (await res.json().catch(() => null)) as { error?: string } | null
       if (!res.ok) {
-        setError(data?.error ?? 'Failed to update identity.')
+        setError(data?.error ? data.error : `Failed to update identity (HTTP ${res.status}).`)
         setSavingId(null)
         return
       }
@@ -72,7 +72,7 @@ export default function AccountManager({ profiles }: { profiles: ProfileRow[] })
       })
       const data = (await res.json().catch(() => null)) as { error?: string } | null
       if (!res.ok) {
-        setError(data?.error ?? 'Failed to delete account.')
+        setError(data?.error ? data.error : `Failed to delete account (HTTP ${res.status}).`)
         setDeletingId(null)
         return
       }

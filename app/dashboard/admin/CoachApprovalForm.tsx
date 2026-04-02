@@ -39,7 +39,11 @@ export default function CoachApprovalForm({ requests }: { requests: CoachRequest
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as { error?: string } | null
-        setError(data?.error ?? 'Failed to update coach request.')
+        setError(
+          data?.error
+            ? data.error
+            : `Failed to update coach request (HTTP ${response.status}).`,
+        )
         setBusyId(null)
         return
       }
