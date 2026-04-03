@@ -48,17 +48,5 @@ export default async function DashboardPage() {
   if (role === 'coach') redirect('/dashboard/coach')
   if (role === 'parent') redirect('/dashboard/parent')
 
-  return (
-    <main style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '22px', fontWeight: '500', marginBottom: '8px' }}>
-        Welcome back, {ensuredProfile?.full_name ?? user.email}
-      </h1>
-      <p style={{ color: '#888', fontSize: '14px' }}>Fall 7, get up 8.</p>
-      {ensuredProfile?.coach_request_pending && (
-        <p style={{ color: '#fbbf24', fontSize: '13px', marginTop: '10px' }}>
-          Your coach request is pending owner approval. You can still use athlete features for now.
-        </p>
-      )}
-    </main>
-  )
+  redirect('/dashboard/athlete')
 }

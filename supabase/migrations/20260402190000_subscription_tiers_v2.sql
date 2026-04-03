@@ -30,4 +30,4 @@ alter table public.subscriptions
 
 alter table public.sessions
   alter column allowed_tiers set default
-    array['standard','performance','elite','youth_standard','youth_elite']::public.subscription_tier[];
+    array['standard','performance_100m','performance_400m','elite','youth_standard','youth_elite']::public.subscription_tier[];

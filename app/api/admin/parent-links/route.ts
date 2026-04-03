@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { normalizeRole } from '@/lib/auth/roles'
+import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
+import { parentLinkSchema, parseBody } from '@/lib/security/validation'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -10,6 +12,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const limited = applyRateLimit(request, 'admin', user.id)
+  if (limited) return limited
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -21,14 +26,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { parentId, athleteId } = (await request.json()) as {
-    parentId?: string
-    athleteId?: string
+  const raw = await safeJsonParse(request)
+  if (raw === '__TOO_LARGE__') {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
   }
-
-  if (!parentId || !athleteId) {
-    return NextResponse.json({ error: 'parentId and athleteId are required.' }, { status: 400 })
+  if (raw === null) {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
+  const parsed = parseBody(parentLinkSchema, raw)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
+  const { parentId, athleteId } = parsed.data
 
   const { error } = await supabase.from('parent_athlete_links').upsert(
     {
@@ -41,4 +50,3 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
-

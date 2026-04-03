@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
+import { parseBody, profilePatchSchema } from '@/lib/security/validation'
 
 export async function PATCH(request: Request) {
   const supabase = await createClient()
@@ -9,12 +11,16 @@ export async function PATCH(request: Request) {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = (await request.json()) as {
-    full_name?: string | null
-    avatar_url?: string | null
-    main_events?: string[] | null
+  const limited = applyRateLimit(request, 'api', user.id)
+  if (limited) return limited
+
+  const rawBody = await safeJsonParse(request)
+  const parsed = parseBody(profilePatchSchema, rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
   }
 
+  const body = parsed.data
   const updates: Record<string, string | string[] | null> = {}
 
   if ('full_name' in body) {

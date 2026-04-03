@@ -13,7 +13,7 @@ export default function NewSessionPage() {
     session_type: 'track_session',
     scheduled_at: '',
     location: '',
-    allowed_tiers: ['standard', 'performance', 'elite', 'youth_standard', 'youth_elite'],
+    allowed_tiers: ['standard', 'performance_100m', 'performance_400m', 'elite', 'youth_standard', 'youth_elite'],
     program: '',
     recurring: false,
     recurrence_end_date: '',
@@ -248,14 +248,15 @@ export default function NewSessionPage() {
           onChange={(e) => setForm((f) => ({ ...f, single_tier: e.target.value }))}
         >
           <option value="standard">standard</option>
-          <option value="performance">performance</option>
+          <option value="performance_100m">performance 100m</option>
+          <option value="performance_400m">performance 400m</option>
           <option value="elite">elite</option>
           <option value="youth_standard">youth standard</option>
           <option value="youth_elite">youth elite</option>
         </select>
       ) : (
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {['standard', 'performance', 'elite', 'youth_standard', 'youth_elite'].map(tier => (
+        {['standard', 'performance_100m', 'performance_400m', 'elite', 'youth_standard', 'youth_elite'].map(tier => (
           <button
             key={tier}
             onClick={() => handleTierToggle(tier)}

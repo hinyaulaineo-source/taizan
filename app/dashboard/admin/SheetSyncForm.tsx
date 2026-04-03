@@ -62,7 +62,7 @@ export default function SheetSyncForm() {
           type="button"
           disabled={loading !== null}
           onClick={() => run(false)}
-          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black hover:bg-zinc-200 disabled:opacity-50"
+          className="rounded-md bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-200 disabled:opacity-50"
         >
           {loading === 'run' ? 'Syncing…' : 'Sync now'}
         </button>

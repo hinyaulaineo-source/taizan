@@ -20,55 +20,38 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          desired_role: role,
-        },
-      },
-    })
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, fullName, role }),
+      })
 
-    if (signUpError) {
-      setError(signUpError.message)
-      setLoading(false)
-      return
-    }
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
 
-    // If the user is immediately signed in, create a profiles row.
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+      if (!res.ok) {
+        setError(data?.error ?? `Signup failed (HTTP ${res.status}).`)
+        setLoading(false)
+        return
+      }
 
-    if (user?.id) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert(
-          {
-            id: user.id,
-            email: user.email ?? email,
-            full_name: fullName,
-            role: role === 'parent' ? 'parent' : 'athlete',
-            coach_request_pending: role === 'coach',
-            coach_requested_at: role === 'coach' ? new Date().toISOString() : null,
-          },
-          { onConflict: 'id' },
-        )
+      // Account created and auto-confirmed — sign in immediately
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      if (profileError) {
-        // Don't block signup; dashboard role routing will auto-fix later.
-        console.warn('profile upsert failed', profileError)
+      if (signInErr) {
+        setError('Account created! Please sign in on the login page.')
+        setLoading(false)
+        return
       }
 
       router.push('/dashboard')
-      return
+    } catch {
+      setError('Network error. Please try again.')
+      setLoading(false)
     }
-
-    // Otherwise, user must verify email; send them back to login.
-    setError('Check your email to confirm your account, then sign in.')
-    setLoading(false)
   }
 
   return (
@@ -217,4 +200,3 @@ export default function SignupPage() {
     </div>
   )
 }
-

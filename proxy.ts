@@ -1,5 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import type { UserRole } from '@/types/roles'
+
+const PROTECTED_ROUTES: Record<string, UserRole[]> = {
+  '/dashboard/admin':    ['owner'],
+  '/dashboard/sessions': ['owner', 'coach'],
+  '/dashboard/feedback': ['owner', 'coach', 'athlete', 'parent'],
+  '/dashboard/bookings': ['athlete', 'parent'],
+}
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
@@ -15,10 +23,12 @@ export async function proxy(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          )
         },
       },
-    }
+    },
   )
 
   const {
@@ -26,24 +36,40 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
-  const isDashboardPath = pathname.startsWith('/dashboard')
-  const isLoginPath = pathname === '/login'
+  const isDashboard = pathname.startsWith('/dashboard')
+  const isLogin = pathname === '/login'
+  const isSignup = pathname === '/signup'
 
-  if (!user && isDashboardPath) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+  // Unauthenticated users trying to access protected routes → login
+  if (!user && isDashboard) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && isLoginPath) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  // Authenticated users on login/signup → dashboard
+  if (user && (isLogin || isSignup)) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Role-based route protection for dashboard sub-paths
+  if (user && isDashboard) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const userRole = profile?.role as UserRole | undefined
+
+    for (const [route, allowedRoles] of Object.entries(PROTECTED_ROUTES)) {
+      if (pathname.startsWith(route) && userRole && !allowedRoles.includes(userRole)) {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+    }
   }
 
   return response
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login'],
+  matcher: ['/dashboard/:path*', '/login', '/signup'],
 }

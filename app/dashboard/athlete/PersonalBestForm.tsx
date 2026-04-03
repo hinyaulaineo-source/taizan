@@ -120,7 +120,7 @@ export default function PersonalBestForm() {
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       <div className="flex justify-end">
-        <Button onClick={submit} disabled={loading} className="bg-white text-black hover:bg-zinc-200">
+        <Button onClick={submit} disabled={loading} className="bg-white text-zinc-800 hover:bg-zinc-200">
           {loading ? 'Saving...' : 'Add PB'}
         </Button>
       </div>

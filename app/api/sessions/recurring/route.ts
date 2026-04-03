@@ -1,18 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { isOwnerLike, normalizeRole } from '@/lib/auth/roles'
+import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
+import { parseBody, sessionRecurringSchema } from '@/lib/security/validation'
 import { NextResponse } from 'next/server'
-
-type Payload = {
-  title?: string
-  session_type?: string
-  start_at?: string
-  end_date?: string
-  location?: string
-  allowed_tiers?: string[]
-  weekdays?: number[]
-  program?: string
-  max_athletes?: number | null
-}
 
 function toIsoForLocalDate(localDate: string, hh: number, mm: number) {
   const [y, m, d] = localDate.split('-').map(Number)
@@ -26,6 +16,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const limited = applyRateLimit(request, 'api', user.id)
+  if (limited) return limited
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -36,22 +29,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const body = (await request.json()) as Payload
+  const rawBody = await safeJsonParse(request)
+  if (rawBody === '__TOO_LARGE__') {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
+  }
+  const parsed = parseBody(sessionRecurringSchema, rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
   const {
     title,
-    session_type = 'track_session',
+    session_type,
     start_at,
     end_date,
-    location = '',
-    allowed_tiers = ['standard', 'performance', 'elite', 'youth_standard', 'youth_elite'],
+    location,
+    allowed_tiers,
     weekdays,
-    program = '',
+    program,
     max_athletes,
-  } = body
-
-  if (!title || !start_at || !end_date) {
-    return NextResponse.json({ error: 'title, start_at, end_date are required.' }, { status: 400 })
-  }
+  } = parsed.data
 
   const startDate = new Date(start_at)
   if (Number.isNaN(startDate.getTime())) {

@@ -76,7 +76,7 @@ export async function POST(request: Request) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {
     return NextResponse.json(
-      { error: 'Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' },
+      { error: 'Server configuration error.' },
       { status: 500 },
     )
   }

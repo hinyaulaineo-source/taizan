@@ -75,7 +75,7 @@ export default function LinkParentForm({
       <Button
         onClick={handleLink}
         disabled={loading || !parentId || !athleteId || parents.length === 0 || athletes.length === 0}
-        className="bg-white text-black hover:bg-zinc-200"
+        className="bg-white text-zinc-800 hover:bg-zinc-200"
       >
         {loading ? 'Linking...' : 'Link parent to athlete'}
       </Button>

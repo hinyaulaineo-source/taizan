@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import DateTimeInput from '@/components/ui/date-time-input'
+import DateTimeInput, { DateInput } from '@/components/ui/date-time-input'
 
 export default function EditSessionForm({
   sessionId,
@@ -41,6 +41,11 @@ export default function EditSessionForm({
     allowed_tiers: initial.allowed_tiers,
     program: initial.program,
     max_athletes: initial.max_athletes ? String(initial.max_athletes) : '',
+    single_tier_only: initial.allowed_tiers.length === 1,
+    single_tier: initial.allowed_tiers[0] ?? 'standard',
+    recurring: false,
+    recurrence_end_date: '',
+    weekdays: [] as number[],
   })
 
   function handleTierToggle(tier: string) {
@@ -50,9 +55,20 @@ export default function EditSessionForm({
     }))
   }
 
+  function handleWeekdayToggle(day: number) {
+    setForm((f) => ({
+      ...f,
+      weekdays: f.weekdays.includes(day) ? f.weekdays.filter((d) => d !== day) : [...f.weekdays, day],
+    }))
+  }
+
   async function handleSubmit() {
     if (!form.title || !form.scheduled_at) {
       setError('Please fill in title and date.')
+      return
+    }
+    if (form.recurring && !form.recurrence_end_date) {
+      setError('Please choose an end date for recurring sessions.')
       return
     }
     if (form.max_athletes && Number(form.max_athletes) <= 0) {
@@ -70,11 +86,12 @@ export default function EditSessionForm({
     }
 
     const iso = new Date(form.scheduled_at).toISOString()
+    const allowedTiers = form.single_tier_only ? [form.single_tier] : form.allowed_tiers
     const baseUpdates = {
       title: form.title,
       session_type: form.session_type,
       location: form.location,
-      allowed_tiers: form.allowed_tiers,
+      allowed_tiers: allowedTiers,
       max_athletes: form.max_athletes ? Number(form.max_athletes) : null,
     }
 
@@ -171,6 +188,30 @@ export default function EditSessionForm({
             return
           }
         }
+      }
+    }
+
+    if (form.recurring && form.recurrence_end_date) {
+      const recurringRes = await fetch('/api/sessions/recurring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: form.title,
+          session_type: form.session_type,
+          start_at: iso,
+          end_date: form.recurrence_end_date,
+          location: form.location,
+          allowed_tiers: allowedTiers,
+          weekdays: form.weekdays,
+          program: form.program,
+          max_athletes: form.max_athletes ? Number(form.max_athletes) : null,
+        }),
+      })
+      if (!recurringRes.ok) {
+        const data = (await recurringRes.json().catch(() => null)) as { error?: string } | null
+        setError(data?.error ?? 'Failed to create recurring sessions.')
+        setLoading(false)
+        return
       }
     }
 
@@ -362,9 +403,88 @@ export default function EditSessionForm({
         onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
       />
 
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ ...labelStyle, marginBottom: '10px' }}>
+          <input
+            type="checkbox"
+            checked={form.recurring}
+            onChange={(e) => setForm((f) => ({ ...f, recurring: e.target.checked }))}
+            style={{ marginRight: '8px' }}
+          />
+          Generate recurring sessions (creates new sessions from this one)
+        </label>
+      </div>
+
+      {form.recurring && (
+        <>
+          <label style={labelStyle}>Recurring end date (min 28 days from start)</label>
+          <div style={{ marginBottom: '16px' }}>
+            <DateInput
+              value={form.recurrence_end_date}
+              onChange={(v) => setForm((f) => ({ ...f, recurrence_end_date: v }))}
+            />
+          </div>
+
+          <label style={labelStyle}>Repeat on weekdays (optional; default = start day only)</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+            {([
+              [0, 'Sun'],
+              [1, 'Mon'],
+              [2, 'Tue'],
+              [3, 'Wed'],
+              [4, 'Thu'],
+              [5, 'Fri'],
+              [6, 'Sat'],
+            ] as const).map(([day, label]) => (
+              <button
+                key={String(day)}
+                type="button"
+                onClick={() => handleWeekdayToggle(day)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  border: '0.5px solid #333',
+                  background: form.weekdays.includes(day) ? '#fff' : '#1a1a1a',
+                  color: form.weekdays.includes(day) ? '#000' : '#666',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
       <label style={labelStyle}>Available to tiers</label>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {['standard', 'performance', 'elite', 'youth_standard', 'youth_elite'].map((tier) => (
+      <div style={{ marginBottom: '10px' }}>
+        <label style={{ ...labelStyle, marginBottom: 0 }}>
+          <input
+            type="checkbox"
+            checked={form.single_tier_only}
+            onChange={(e) => setForm((f) => ({ ...f, single_tier_only: e.target.checked }))}
+            style={{ marginRight: '8px' }}
+          />
+          Single subscription tier only
+        </label>
+      </div>
+      {form.single_tier_only ? (
+        <select
+          style={inputStyle}
+          value={form.single_tier}
+          onChange={(e) => setForm((f) => ({ ...f, single_tier: e.target.value }))}
+        >
+          <option value="standard">standard</option>
+          <option value="performance_100m">performance 100m</option>
+          <option value="performance_400m">performance 400m</option>
+          <option value="elite">elite</option>
+          <option value="youth_standard">youth standard</option>
+          <option value="youth_elite">youth elite</option>
+        </select>
+      ) : (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+        {['standard', 'performance_100m', 'performance_400m', 'elite', 'youth_standard', 'youth_elite'].map((tier) => (
           <button
             key={tier}
             onClick={() => handleTierToggle(tier)}
@@ -384,6 +504,7 @@ export default function EditSessionForm({
           </button>
         ))}
       </div>
+      )}
 
       <label style={labelStyle}>How many athletes can be assigned (optional)</label>
       <input
@@ -421,7 +542,7 @@ export default function EditSessionForm({
             opacity: loading || deleting || cancelling ? 0.7 : 1,
         }}
       >
-        {loading ? 'Saving...' : 'Save changes'}
+        {loading ? 'Saving...' : form.recurring ? 'Save & create recurring sessions' : 'Save changes'}
       </button>
 
       <div style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>

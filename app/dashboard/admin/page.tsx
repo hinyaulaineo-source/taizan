@@ -9,6 +9,8 @@ import SheetSyncForm from './SheetSyncForm'
 import CoachApprovalForm from './CoachApprovalForm'
 import AccountManager from './AccountManager'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -55,13 +57,16 @@ export default async function AdminDashboard() {
     .select('id, full_name, email, role, coach_request_pending')
     .neq('role', 'owner')
 
-  const athleteIds = (athletes ?? []).map((a: any) => a.id)
+  type AthleteRow = { id: string }
+  const athleteIds = (athletes ?? []).map((a: AthleteRow) => a.id)
   const { data: subscriptions } = athleteIds.length > 0
     ? await supabase
         .from('subscriptions')
         .select('user_id, tier, status')
         .in('user_id', athleteIds)
-    : { data: [] as any[] }
+    : {
+        data: [] as Array<{ user_id: string; tier: string; status: string }>
+      }
 
   const pendingSessionsByCreatedDate = (() => {
     const groups = new Map<string, typeof pendingSessions>()
@@ -182,7 +187,7 @@ export default async function AdminDashboard() {
       </section>
 
       <section className="mt-10">
-        <h2 className="mb-3 text-base font-semibold text-zinc-100">Sync athletes from Google Sheet</h2>
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Import athletes from CSV</h2>
         <Card>
           <CardContent className="p-6">
             <SheetSyncForm />

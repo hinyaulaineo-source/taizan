@@ -50,6 +50,12 @@ export default async function AthleteDashboard() {
     .eq('status', 'published')
     .order('scheduled_at', { ascending: true })
 
+  const { data: attendanceRows } = await supabase
+    .from('attendance')
+    .select('session_id, checked_in, marked_at, sessions!inner(scheduled_at)')
+    .eq('athlete_id', user.id)
+    .eq('checked_in', true)
+
   const { data: personalBests } = await supabase
     .from('personal_bests')
     .select('id, metric, value, unit, recorded_at')
@@ -90,12 +96,24 @@ export default async function AthleteDashboard() {
     return rows.slice(-8)
   })()
 
-  const personalBestValue = pbRows.reduce((best, row) => {
-    if (best === null) return row.value
-    return Math.min(best, row.value)
-  }, null as number | null)
+  const personalBestByMetric = (() => {
+    const bestMap = new Map<string, { value: number; unit: string }>()
+    for (const row of pbRows) {
+      const existing = bestMap.get(row.metric)
+      const isFieldEvent = row.unit === 'm'
+      if (!existing) {
+        bestMap.set(row.metric, { value: row.value, unit: row.unit })
+      } else if (isFieldEvent && row.value > existing.value) {
+        bestMap.set(row.metric, { value: row.value, unit: row.unit })
+      } else if (!isFieldEvent && row.value < existing.value) {
+        bestMap.set(row.metric, { value: row.value, unit: row.unit })
+      }
+    }
+    return bestMap
+  })()
 
   const latestPb = pbRows.length > 0 ? pbRows[pbRows.length - 1] : null
+  const latestPbBest = latestPb ? personalBestByMetric.get(latestPb.metric) : null
 
   const attendanceStats = (() => {
     const now = new Date()
@@ -104,18 +122,26 @@ export default async function AthleteDashboard() {
     const d84 = new Date(now)
     d84.setUTCDate(d84.getUTCDate() - 84)
 
-    const in30 = (bookings ?? []).filter((b: any) => {
-      const t = new Date((b.sessions as any)?.scheduled_at ?? b.booked_at)
+    const checkedInRows = (attendanceRows ?? []).filter((a: any) => a.checked_in)
+
+    const in30 = checkedInRows.filter((a: any) => {
+      const t = new Date((a.sessions as any)?.scheduled_at ?? a.marked_at)
       return !Number.isNaN(t.getTime()) && t >= d30
     }).length
 
-    const in84 = (bookings ?? []).filter((b: any) => {
+    const in84 = checkedInRows.filter((a: any) => {
+      const t = new Date((a.sessions as any)?.scheduled_at ?? a.marked_at)
+      return !Number.isNaN(t.getTime()) && t >= d84
+    }).length
+
+    const bookedIn84 = (bookings ?? []).filter((b: any) => {
       const t = new Date((b.sessions as any)?.scheduled_at ?? b.booked_at)
       return !Number.isNaN(t.getTime()) && t >= d84
     }).length
 
-    const weeks = 12
-    const attendanceRate = Math.min(100, Math.round((in84 / weeks) * 100))
+    const attendanceRate = bookedIn84 > 0
+      ? Math.min(100, Math.round((in84 / bookedIn84) * 100))
+      : 0
     return { in30, in84, attendanceRate }
   })()
 
@@ -192,8 +218,7 @@ export default async function AthleteDashboard() {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">Personal Best Progression</h2>
               <Badge tone="success">
-                PB {personalBestValue !== null ? personalBestValue : '-'}
-                {latestPb?.unit ? ` ${latestPb.unit}` : ''}
+                PB {latestPbBest ? `${latestPbBest.value} ${latestPbBest.unit}` : '-'}
               </Badge>
             </div>
             {latestPb && (
@@ -242,7 +267,7 @@ export default async function AthleteDashboard() {
               </div>
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              Attendance is estimated from booked sessions in the last 12 weeks.
+              Based on coach check-ins. Rate = checked-in ÷ booked sessions (last 12 weeks).
             </p>
           </CardContent>
         </Card>
@@ -258,7 +283,10 @@ export default async function AthleteDashboard() {
                 {(eligibleAvailableSessions[0] as any).title} ·{' '}
                 {new Date((eligibleAvailableSessions[0] as any).scheduled_at).toLocaleString()}
               </p>
-              <a href="/dashboard/athlete/book" className="accent-btn mt-6 inline-block">
+              <a
+                href={`/dashboard/athlete/session/${(eligibleAvailableSessions[0] as any).id}`}
+                className="accent-btn mt-6 inline-block"
+              >
                 Open Session
               </a>
             </>
@@ -371,7 +399,7 @@ export default async function AthleteDashboard() {
           ))}
         </div>
       </section>
-      <MobileBottomNav />
+      <MobileBottomNav role="athlete" />
     </main>
   )
 }

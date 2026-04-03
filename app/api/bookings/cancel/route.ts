@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
+import { cancelBookingSchema, parseBody } from '@/lib/security/validation'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -10,8 +12,18 @@ export async function POST(request: Request) {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { sessionId } = (await request.json()) as { sessionId?: string }
-  if (!sessionId) return NextResponse.json({ error: 'sessionId is required.' }, { status: 400 })
+  const limited = applyRateLimit(request, 'api', user.id)
+  if (limited) return limited
+
+  const rawBody = await safeJsonParse(request)
+  if (rawBody === '__TOO_LARGE__') {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
+  }
+  const parsed = parseBody(cancelBookingSchema, rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
+  const { sessionId } = parsed.data
 
   // Update existing booking to cancelled (re-booking is allowed due to upsert on athlete_id+session_id).
   const { error } = await supabase
@@ -24,4 +36,3 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true })
 }
-

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { normalizeRole } from '@/lib/auth/roles'
+import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
+import { parentCancelSchema, parseBody } from '@/lib/security/validation'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -9,6 +11,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const limited = applyRateLimit(request, 'api', user.id)
+  if (limited) return limited
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -20,14 +25,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { athleteId, sessionId } = (await request.json()) as {
-    athleteId?: string
-    sessionId?: string
+  const raw = await safeJsonParse(request)
+  if (raw === '__TOO_LARGE__') {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
   }
-
-  if (!athleteId || !sessionId) {
-    return NextResponse.json({ error: 'athleteId and sessionId are required.' }, { status: 400 })
+  if (raw === null) {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
+  const parsed = parseBody(parentCancelSchema, raw)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
+  const { athleteId, sessionId } = parsed.data
 
   const { error } = await supabase
     .from('bookings')
@@ -39,4 +48,3 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true })
 }
-

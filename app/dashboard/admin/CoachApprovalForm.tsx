@@ -81,7 +81,7 @@ export default function CoachApprovalForm({ requests }: { requests: CoachRequest
               onClick={() => run(r.id, 'approve')}
               variant="outline"
               disabled={busyId === r.id}
-              className="bg-white text-black hover:bg-zinc-200 border border-border"
+              className="hover:bg-zinc-200 border border-border"
             >
               Approve coach
             </Button>

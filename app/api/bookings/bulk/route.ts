@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
+import { bulkBookingSchema, parseBody } from '@/lib/security/validation'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -8,6 +10,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser()
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const limited = applyRateLimit(request, 'api', user.id)
+  if (limited) return limited
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -19,10 +24,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Only athletes can book sessions.' }, { status: 403 })
   }
 
-  const { sessionIds } = (await request.json()) as { sessionIds?: string[] }
-  if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
-    return NextResponse.json({ error: 'sessionIds is required.' }, { status: 400 })
+  const rawBody = await safeJsonParse(request)
+  if (rawBody === '__TOO_LARGE__') {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
   }
+  const parsed = parseBody(bulkBookingSchema, rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
+  const { sessionIds } = parsed.data
 
   const normalizedIds = Array.from(new Set(sessionIds.filter(Boolean)))
   if (normalizedIds.length === 0) {

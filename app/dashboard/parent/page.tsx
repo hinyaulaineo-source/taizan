@@ -274,7 +274,7 @@ export default async function ParentDashboard() {
           ))}
         </div>
       </section>
-      <MobileBottomNav />
+      <MobileBottomNav role="parent" />
     </main>
   )
 }

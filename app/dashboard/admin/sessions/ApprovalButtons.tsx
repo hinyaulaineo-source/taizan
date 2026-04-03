@@ -37,7 +37,7 @@ export default function ApprovalButtons({ sessionId }: { sessionId: string }) {
         <button
           onClick={() => updateStatus('published')}
           disabled={loading !== null}
-          className="rounded-md bg-white px-4 py-1.5 text-xs font-medium text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-white px-4 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading === 'published' ? 'Publishing...' : 'Approve'}
         </button>

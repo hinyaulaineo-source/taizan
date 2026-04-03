@@ -136,7 +136,7 @@ export function Calendar({
           </p>
           <div className="mt-3">
             <Link href={bookingLink}>
-              <Button className="bg-white text-black hover:bg-zinc-200">Book Now</Button>
+              <Button className="bg-white text-zinc-800 hover:bg-zinc-200">Book Now</Button>
             </Link>
           </div>
         </div>
@@ -210,7 +210,7 @@ export function Calendar({
                   ) : ev.canBook && ev.bookHref ? (
                     <Link
                       href={ev.bookHref}
-                      className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-zinc-200"
+                      className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 hover:bg-zinc-200"
                     >
                       Book
                     </Link>

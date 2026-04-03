@@ -34,8 +34,16 @@ export default async function CoachDashboard() {
     .order('created_at', { ascending: false })
     .limit(50)
 
+  const coachSessionIds = new Set((sessions ?? []).map((s) => s.id))
+  const { data: coachBookings } = coachSessionIds.size > 0
+    ? await supabase
+        .from('bookings')
+        .select('athlete_id, session_id, booked_at')
+        .in('session_id', Array.from(coachSessionIds))
+    : { data: [] as Array<{ athlete_id: string; session_id: string; booked_at: string }> }
+
   const roster = (() => {
-    const map = new Map<string, { athlete_id: string; full_name: string | null; email: string; last_created_at: string }>()
+    const map = new Map<string, { athlete_id: string; full_name: string | null; email: string; last_created_at: string; bookingCount: number }>()
     ;(feedbackRows ?? []).forEach((f: any) => {
       if (!f.athlete_id) return
       if (!map.has(f.athlete_id)) {
@@ -44,11 +52,20 @@ export default async function CoachDashboard() {
           full_name: f.profiles?.full_name ?? null,
           email: f.profiles?.email ?? '',
           last_created_at: f.created_at,
+          bookingCount: 0,
         })
+      }
+    })
+    ;(coachBookings ?? []).forEach((b) => {
+      const existing = map.get(b.athlete_id)
+      if (existing) {
+        existing.bookingCount += 1
       }
     })
     return Array.from(map.values())
   })()
+
+  const totalCoachSessions = coachSessionIds.size || 1
 
   const sessionsByCreatedDate = (() => {
     const groups = new Map<string, typeof sessions>()
@@ -186,6 +203,12 @@ export default async function CoachDashboard() {
                           {session.status}
                         </Badge>
                         <Link
+                          href={`/dashboard/coach/check-in/${session.id}`}
+                          className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent"
+                        >
+                          Check-in
+                        </Link>
+                        <Link
                           href={`/dashboard/coach/edit-session/${session.id}`}
                           className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent"
                         >
@@ -211,23 +234,26 @@ export default async function CoachDashboard() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {roster.map((a) => (
-              <Card key={a.athlete_id}>
-                <CardContent className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{a.full_name ?? 'Unnamed'}</p>
-                    <p className="text-xs text-muted-foreground">{a.email}</p>
-                    <div className="mt-2 w-48">
-                      <WorkoutProgressBar value={60} />
+            {roster.map((a) => {
+              const pct = Math.min(100, Math.round((a.bookingCount / totalCoachSessions) * 100))
+              return (
+                <Card key={a.athlete_id}>
+                  <CardContent className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{a.full_name ?? 'Unnamed'}</p>
+                      <p className="text-xs text-muted-foreground">{a.email}</p>
+                      <div className="mt-2 w-48">
+                        <WorkoutProgressBar value={pct} />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <WorkoutProgressRing value={60} />
-                    <Badge tone="neutral">Last: {new Date(a.last_created_at).toLocaleDateString()}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="flex items-center gap-3">
+                      <WorkoutProgressRing value={pct} />
+                      <Badge tone="neutral">Last: {new Date(a.last_created_at).toLocaleDateString()}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
       </section>

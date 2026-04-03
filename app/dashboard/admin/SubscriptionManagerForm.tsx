@@ -11,7 +11,7 @@ export default function SubscriptionManagerForm({
   athletes: { id: string; full_name: string | null; email: string }[]
   subscriptions: { user_id: string; tier: string; status: string }[]
 }) {
-  type Tier = 'standard' | 'performance' | 'elite' | 'youth_standard' | 'youth_elite'
+  type Tier = 'standard' | 'performance_100m' | 'performance_400m' | 'elite' | 'youth_standard' | 'youth_elite'
   const router = useRouter()
   const subscriptionByAthleteId = useMemo(() => {
     const m = new Map<string, { tier: string; status: string }>()
@@ -38,7 +38,8 @@ export default function SubscriptionManagerForm({
             const current = subscriptionByAthleteId.get(nextId)
             if (
               current?.tier === 'standard' ||
-              current?.tier === 'performance' ||
+              current?.tier === 'performance_100m' ||
+              current?.tier === 'performance_400m' ||
               current?.tier === 'elite' ||
               current?.tier === 'youth_standard' ||
               current?.tier === 'youth_elite'
@@ -68,7 +69,8 @@ export default function SubscriptionManagerForm({
             onChange={(e) => setTier(e.target.value as any)}
           >
             <option value="standard">standard</option>
-            <option value="performance">performance</option>
+            <option value="performance_100m">performance 100m</option>
+            <option value="performance_400m">performance 400m</option>
             <option value="elite">elite</option>
             <option value="youth_standard">youth standard</option>
             <option value="youth_elite">youth elite</option>
@@ -110,7 +112,7 @@ export default function SubscriptionManagerForm({
           setLoading(false)
         }}
         disabled={loading || !athleteId || athletes.length === 0}
-        className="bg-white text-black hover:bg-zinc-200"
+        className="bg-white text-zinc-800 hover:bg-zinc-200"
       >
         {loading ? 'Saving...' : 'Save subscription'}
       </Button>

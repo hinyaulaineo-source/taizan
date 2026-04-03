@@ -124,7 +124,8 @@ export default function AccountManager({ profiles }: { profiles: ProfileRow[] })
                   <Button
                     onClick={() => updateRole(p.id, draftRole)}
                     disabled={savingId === p.id}
-                    className="bg-white text-black hover:bg-zinc-200"
+                    variant="outline"
+                    className="hover:bg-zinc-200"
                   >
                     {savingId === p.id ? 'Saving…' : 'Save'}
                   </Button>

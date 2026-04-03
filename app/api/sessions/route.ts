@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { isOwnerLike } from '@/lib/auth/roles'
+import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
+import { parseBody, sessionCreateSchema, sessionPatchSchema } from '@/lib/security/validation'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -7,26 +9,43 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const limited = applyRateLimit(request, 'api', user.id)
+  if (limited) return limited
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
 
-  const body = (await request.json()) as {
-    max_athletes?: number | null
-    allowed_tiers?: string[]
-    [key: string]: unknown
+  const rawBody = await safeJsonParse(request)
+  if (rawBody === '__TOO_LARGE__') {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
   }
+  const parsed = parseBody(sessionCreateSchema, rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
+  const validated = parsed.data
+
   const maxAthletes =
-    typeof body.max_athletes === 'number' && Number.isFinite(body.max_athletes)
-      ? Math.max(1, Math.floor(body.max_athletes))
+    typeof validated.max_athletes === 'number' && Number.isFinite(validated.max_athletes)
+      ? Math.max(1, Math.floor(validated.max_athletes))
       : null
   const status = isOwnerLike(profile?.role) ? 'published' : 'pending'
 
   const { data, error } = await supabase
     .from('sessions')
-    .insert({ ...body, max_athletes: maxAthletes, created_by: user.id, status })
+    .insert({
+      title: validated.title,
+      session_type: validated.session_type,
+      scheduled_at: validated.scheduled_at,
+      location: validated.location,
+      allowed_tiers: validated.allowed_tiers,
+      max_athletes: maxAthletes,
+      created_by: user.id,
+      status,
+    })
     .select()
     .single()
 
@@ -44,6 +63,9 @@ export async function PATCH(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const limited = applyRateLimit(request, 'api', user.id)
+  if (limited) return limited
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -54,10 +76,15 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { id, status } = (await request.json()) as { id?: string; status?: string }
-  if (!id || !status || !['draft', 'published', 'cancelled'].includes(status)) {
-    return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 })
+  const rawBody = await safeJsonParse(request)
+  if (rawBody === '__TOO_LARGE__') {
+    return NextResponse.json({ error: 'Payload too large' }, { status: 413 })
   }
+  const parsed = parseBody(sessionPatchSchema, rawBody)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  }
+  const { id, status } = parsed.data
 
   const { data, error } = await supabase
     .from('sessions')
