@@ -102,7 +102,7 @@ npm run build
 
 1. Import the GitHub repo and set **all** environment variables from §1 for Production(and Preview if you use previews).
 2. **Stripe:** create a webhook endpoint pointing to `https://<your-domain>/api/webhooks/stripe`, select events `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, and paste the signing secret into `STRIPE_WEBHOOK_SECRET`.
-3. **Cron:** [`vercel.json`](vercel.json) registers daily roster sync (`05:00` UTC) and hourly session reminders. Cron jobs only run on [Vercel’s production deployment](https://vercel.com/docs/cron-jobs); set `CRON_SECRET` so requests are authenticated.
+3. **Cron:** [`vercel.json`](vercel.json) registers **daily** jobs: roster sync `05:00` UTC, session reminders `06:00` UTC. On [Vercel Hobby](https://vercel.com/docs/cron-jobs), crons must run **at most once per day** (hourly schedules are rejected). Pro allows more frequent runs. Cron only runs on production; set `CRON_SECRET` so requests are authenticated.
 
 ### Automation endpoints
 
