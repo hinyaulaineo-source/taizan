@@ -118,7 +118,9 @@ export default function FeedbackForm({ athletes, sessions }: { athletes: Athlete
           border: 'none',
           borderRadius: '8px',
           fontSize: '14px',
-          fontWeight: '500',
+          fontFamily: 'var(--font-geist-mono)',
+          fontWeight: '900',
+          boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
           cursor: loading ? 'not-allowed' : 'pointer',
           opacity: loading ? 0.7 : 1,
         }}

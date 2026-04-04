@@ -38,46 +38,76 @@ export default async function CoachDashboard() {
   const { data: coachBookings } = coachSessionIds.size > 0
     ? await supabase
         .from('bookings')
-        .select('athlete_id, session_id, booked_at')
+        .select('athlete_id, session_id, booked_at, profiles!bookings_athlete_id_fkey(full_name, email)')
         .in('session_id', Array.from(coachSessionIds))
-    : { data: [] as Array<{ athlete_id: string; session_id: string; booked_at: string }> }
+    : { data: [] as Array<{ athlete_id: string; session_id: string; booked_at: string; profiles: { full_name: string | null; email: string } | null }> }
 
   const roster = (() => {
-    const map = new Map<string, { athlete_id: string; full_name: string | null; email: string; last_created_at: string; bookingCount: number }>()
+    const map = new Map<string, { athlete_id: string; full_name: string | null; email: string; last_feedback_at: string | null; bookingCount: number }>()
+
+    ;(coachBookings ?? []).forEach((b: any) => {
+      const existing = map.get(b.athlete_id)
+      if (existing) {
+        existing.bookingCount += 1
+      } else {
+        map.set(b.athlete_id, {
+          athlete_id: b.athlete_id,
+          full_name: b.profiles?.full_name ?? null,
+          email: b.profiles?.email ?? '',
+          last_feedback_at: null,
+          bookingCount: 1,
+        })
+      }
+    })
+
     ;(feedbackRows ?? []).forEach((f: any) => {
       if (!f.athlete_id) return
-      if (!map.has(f.athlete_id)) {
+      const existing = map.get(f.athlete_id)
+      if (existing) {
+        if (!existing.last_feedback_at || f.created_at > existing.last_feedback_at) {
+          existing.last_feedback_at = f.created_at
+        }
+        if (!existing.full_name && f.profiles?.full_name) {
+          existing.full_name = f.profiles.full_name
+        }
+        if (!existing.email && f.profiles?.email) {
+          existing.email = f.profiles.email
+        }
+      } else {
         map.set(f.athlete_id, {
           athlete_id: f.athlete_id,
           full_name: f.profiles?.full_name ?? null,
           email: f.profiles?.email ?? '',
-          last_created_at: f.created_at,
+          last_feedback_at: f.created_at,
           bookingCount: 0,
         })
       }
     })
-    ;(coachBookings ?? []).forEach((b) => {
-      const existing = map.get(b.athlete_id)
-      if (existing) {
-        existing.bookingCount += 1
-      }
-    })
+
     return Array.from(map.values())
   })()
 
   const totalCoachSessions = coachSessionIds.size || 1
 
-  const sessionsByCreatedDate = (() => {
+  const sessionsByBatch = (() => {
     const groups = new Map<string, typeof sessions>()
     ;(sessions ?? []).forEach((s) => {
-      const key = s.created_at
-        ? new Date(s.created_at).toLocaleDateString()
-        : 'Unknown date'
+      const key = s.created_at ?? 'unknown'
       const arr = groups.get(key) ?? []
       arr.push(s)
       groups.set(key, arr)
     })
-    return Array.from(groups.entries())
+    return Array.from(groups.entries()).map(([key, group]) => {
+      const first = group![0]
+      const title = first.title ?? 'Untitled'
+      const date = key !== 'unknown'
+        ? new Date(key).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+        : 'Unknown date'
+      const label = group!.length > 1
+        ? `${title} — ${group!.length} sessions (${date})`
+        : `${title} (${date})`
+      return { key, label, group: group! }
+    })
   })()
 
   return (
@@ -133,6 +163,7 @@ export default async function CoachDashboard() {
             )
           })()}
           bookingLink="/dashboard/coach/new-session"
+          weeklyLink="/dashboard/coach/weekly"
           initialMonth={new Date()}
         />
       </section>
@@ -164,15 +195,15 @@ export default async function CoachDashboard() {
           </Card>
         )}
 
-        {sessionsByCreatedDate.length > 0 && (
+        {sessionsByBatch.length > 0 && (
           <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1">
-            {sessionsByCreatedDate.map(([createdDate, group]) => (
-              <div key={createdDate}>
+            {sessionsByBatch.map(({ key, label, group }) => (
+              <div key={key}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Created on {createdDate}
+                    {label}
                   </p>
-                  {group && group.length > 0 ? (
+                  {group.length > 1 ? (
                     <Link
                       href={`/dashboard/coach/edit-session/${group[0].id}?batch=1`}
                       className="rounded-md border border-border px-2.5 py-1 text-[11px] text-foreground hover:bg-accent"
@@ -181,7 +212,7 @@ export default async function CoachDashboard() {
                     </Link>
                   ) : null}
                 </div>
-                {group?.map((session) => (
+                {group.map((session) => (
                   <Card key={session.id} className="mb-2">
                     <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
@@ -225,15 +256,18 @@ export default async function CoachDashboard() {
       </section>
 
       <section className="mt-10">
-        <h2 className="mb-3 text-base font-semibold text-foreground">My roster</h2>
+        <h2 className="mb-3 text-base font-semibold text-foreground">
+          My roster
+          <span className="ml-2 text-sm font-normal text-zinc-500">({roster.length})</span>
+        </h2>
         {roster.length === 0 ? (
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">No athlete feedback saved yet.</p>
+              <p className="text-sm text-muted-foreground">No athletes yet.</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
             {roster.map((a) => {
               const pct = Math.min(100, Math.round((a.bookingCount / totalCoachSessions) * 100))
               return (
@@ -248,7 +282,11 @@ export default async function CoachDashboard() {
                     </div>
                     <div className="flex items-center gap-3">
                       <WorkoutProgressRing value={pct} />
-                      <Badge tone="neutral">Last: {new Date(a.last_created_at).toLocaleDateString()}</Badge>
+                      {a.last_feedback_at ? (
+                        <Badge tone="neutral">Last: {new Date(a.last_feedback_at).toLocaleDateString('en-GB')}</Badge>
+                      ) : (
+                        <Badge tone="warning">No feedback yet</Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

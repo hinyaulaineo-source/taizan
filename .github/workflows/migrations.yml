@@ -1,0 +1,35 @@
+# Reminder: applying SQL to Supabase is not fully automatable from GitHub without
+# project credentials. Use this workflow to validate the repo on every PR.
+
+name: Migrations check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  verify-order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Migration filenames must sort chronologically (timestamp prefix)
+        run: |
+          set -e
+          cd supabase/migrations
+          shopt -s nullglob
+          files=( *.sql )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No migration files."
+            exit 0
+          fi
+          printf '%s\n' "${files[@]}" | sort -c || {
+            echo "Rename migrations so lexical order matches apply order (e.g. 20260405120000_name.sql)."
+            exit 1
+          }
+          echo "OK: ${#files[@]} migration file(s)"

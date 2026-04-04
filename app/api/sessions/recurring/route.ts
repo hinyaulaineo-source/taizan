@@ -39,6 +39,7 @@ export async function POST(request: Request) {
   }
   const {
     title,
+    description,
     session_type,
     start_at,
     end_date,
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
 
   const rows: {
     title: string
+    description: string
     session_type: string
     scheduled_at: string
     location: string
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
       ).padStart(2, '0')}`
       rows.push({
         title,
+        description,
         session_type,
         scheduled_at: toIsoForLocalDate(localDay, hh, mm),
         location,

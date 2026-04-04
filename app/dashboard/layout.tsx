@@ -35,11 +35,13 @@ export default async function DashboardLayout({
     ],
     coach: [
       { href: '/dashboard/coach', label: 'Coach Dashboard' },
+      { href: '/dashboard/coach/weekly', label: 'Weekly Schedule' },
       { href: '/dashboard/coach/new-session', label: 'New Session' },
       { href: '/dashboard/coach/feedback', label: 'Add Feedback' },
     ],
     athlete: [
       { href: '/dashboard/athlete', label: 'Athlete Dashboard' },
+      { href: '/dashboard/athlete/weekly', label: 'Weekly Schedule' },
       { href: '/dashboard/athlete/profile', label: 'My profile' },
     ],
     parent: [{ href: '/dashboard/parent', label: 'Parent Dashboard' }],

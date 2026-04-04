@@ -49,6 +49,7 @@ create table if not exists public.sessions (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   session_type text not null default 'track_session',
+  description text not null default '',
   scheduled_at timestamptz not null,
   location text,
   allowed_tiers public.subscription_tier[] not null default array['standard','performance_100m','performance_400m','elite','youth_standard','youth_elite']::public.subscription_tier[],
@@ -292,6 +293,15 @@ for insert with check (
   )
 );
 
+drop policy if exists "bookings create by coach or owner" on public.bookings;
+create policy "bookings create by coach or owner" on public.bookings
+for insert with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('coach', 'owner')
+  )
+);
+
 drop policy if exists "bookings update by athlete" on public.bookings;
 create policy "bookings update by athlete" on public.bookings
 for update
@@ -313,6 +323,22 @@ with check (
     select 1 from public.parent_athlete_links l
     where l.parent_id = auth.uid()
       and l.athlete_id = public.bookings.athlete_id
+  )
+);
+
+drop policy if exists "bookings update by coach or owner" on public.bookings;
+create policy "bookings update by coach or owner" on public.bookings
+for update
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('coach', 'owner')
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('coach', 'owner')
   )
 );
 
@@ -449,6 +475,20 @@ for all using (
   )
 );
 
+drop policy if exists "attendance self check-in by athlete" on public.attendance;
+create policy "attendance self check-in by athlete" on public.attendance
+for insert with check (
+  athlete_id = auth.uid() and marked_by = auth.uid()
+);
+
+drop policy if exists "attendance self update by athlete" on public.attendance;
+create policy "attendance self update by athlete" on public.attendance
+for update using (
+  athlete_id = auth.uid() and marked_by = auth.uid()
+) with check (
+  athlete_id = auth.uid() and marked_by = auth.uid()
+);
+
 -- Parent links
 drop policy if exists "parent links read own or privileged" on public.parent_athlete_links;
 create policy "parent links read own or privileged" on public.parent_athlete_links
@@ -475,3 +515,18 @@ with check (
     where p.id = auth.uid() and p.role = 'owner'
   )
 );
+
+-- Automation (see supabase/migrations/20260405100000_subscriptions_stripe_notification_reminders.sql)
+alter table public.subscriptions
+  add column if not exists stripe_customer_id text,
+  add column if not exists stripe_subscription_id text;
+
+create table if not exists public.session_reminder_sent (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  athlete_id uuid not null references public.profiles(id) on delete cascade,
+  sent_at timestamptz not null default now(),
+  unique(session_id, athlete_id)
+);
+
+alter table public.session_reminder_sent enable row level security;

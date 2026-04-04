@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     .from('sessions')
     .insert({
       title: validated.title,
+      description: validated.description,
       session_type: validated.session_type,
       scheduled_at: validated.scheduled_at,
       location: validated.location,

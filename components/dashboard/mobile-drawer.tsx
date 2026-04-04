@@ -28,11 +28,12 @@ export default function MobileDrawer({
       {open && (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
           <div
-            className="absolute inset-0 bg-background/60"
+            className="absolute inset-0 z-0 bg-background/85 backdrop-blur-sm"
             onClick={() => setOpen(false)}
+            aria-hidden
           />
 
-          <div className="absolute left-0 top-0 h-full w-80 border-r border-border bg-card/95 px-4 py-5">
+          <div className="absolute left-0 top-0 z-10 flex h-full w-[min(20rem,100vw)] flex-col border-r border-border bg-card px-4 py-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-widest text-muted-foreground">TrackZAN</p>

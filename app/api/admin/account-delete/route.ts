@@ -55,7 +55,39 @@ export async function POST(request: Request) {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Delete from auth.users (cascade will remove the profiles row too)
+  // Manually remove related rows so the auth.users cascade doesn't choke
+  // on the deep FK chain. Service-role client bypasses RLS.
+
+  // Sessions created by this user — need their IDs to clean child tables
+  const { data: userSessions } = await admin
+    .from('sessions')
+    .select('id')
+    .eq('created_by', profileId)
+  const sessionIds = (userSessions ?? []).map((s) => s.id)
+
+  if (sessionIds.length > 0) {
+    await admin.from('attendance').delete().in('session_id', sessionIds)
+    await admin.from('bookings').delete().in('session_id', sessionIds)
+    await admin.from('feedback').delete().in('session_id', sessionIds)
+    await admin.from('programs').delete().in('session_id', sessionIds)
+    await admin.from('sessions').delete().in('id', sessionIds)
+  }
+
+  // Direct references to this profile
+  await admin.from('attendance').delete().or(`athlete_id.eq.${profileId},marked_by.eq.${profileId}`)
+  await admin.from('bookings').delete().eq('athlete_id', profileId)
+  await admin.from('feedback').delete().or(`athlete_id.eq.${profileId},coach_id.eq.${profileId}`)
+  await admin.from('personal_bests').delete().or(`athlete_id.eq.${profileId},created_by.eq.${profileId}`)
+  await admin.from('parent_athlete_links').delete().or(`parent_id.eq.${profileId},athlete_id.eq.${profileId}`)
+  await admin.from('subscriptions').delete().eq('user_id', profileId)
+  await admin.from('programs').delete().eq('created_by', profileId)
+
+  // Null out approved_by references on sessions approved by this user
+  await admin.from('sessions').update({ approved_by: null }).eq('approved_by', profileId)
+
+  // Now the profile row and auth user can be cleanly removed
+  await admin.from('profiles').delete().eq('id', profileId)
+
   const { error: authErr } = await admin.auth.admin.deleteUser(profileId)
   if (authErr) {
     return NextResponse.json({ error: `Failed to delete user: ${authErr.message}` }, { status: 500 })

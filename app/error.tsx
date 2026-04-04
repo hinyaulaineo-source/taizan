@@ -21,7 +21,7 @@ export default function ErrorPage({
       <div className="mt-8 flex gap-3">
         <button
           onClick={reset}
-          className="rounded-md bg-white px-6 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-200"
+          className="rounded-md bg-white px-6 py-3 text-sm font-black text-zinc-800 hover:bg-zinc-200"
         >
           Try Again
         </button>

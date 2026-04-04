@@ -18,11 +18,40 @@ const ROLE_OPTIONS = [
   { value: 'coach', label: 'Coach' },
 ] as const
 
-export default function AccountManager({ profiles }: { profiles: ProfileRow[] }) {
+type SubRow = { user_id: string; tier: string; status: string }
+
+export default function AccountManager({
+  profiles,
+  subscriptions = [],
+}: {
+  profiles: ProfileRow[]
+  subscriptions?: SubRow[]
+}) {
   const router = useRouter()
   const [savingId, setSavingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
+
+  const subByUserId = useMemo(() => {
+    const map = new Map<string, { tier: string; status: string }>()
+    subscriptions.forEach((s) => map.set(s.user_id, { tier: s.tier, status: s.status }))
+    return map
+  }, [subscriptions])
+
+  const TIER_SORT: Record<string, number> = {
+    elite: 1, performance_100m: 2, performance_400m: 3,
+    standard: 4, youth_elite: 5, youth_standard: 6,
+  }
+
+  const sortedProfiles = useMemo(() =>
+    [...profiles].sort((a, b) => {
+      const aOrder = TIER_SORT[subByUserId.get(a.id)?.tier ?? ''] ?? 99
+      const bOrder = TIER_SORT[subByUserId.get(b.id)?.tier ?? ''] ?? 99
+      if (aOrder !== bOrder) return aOrder - bOrder
+      return (a.full_name ?? '').localeCompare(b.full_name ?? '')
+    }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [profiles, subByUserId])
 
   const initialById = useMemo(() => {
     const map = new Map<string, string>()
@@ -86,16 +115,28 @@ export default function AccountManager({ profiles }: { profiles: ProfileRow[] })
 
   return (
     <div className="space-y-3">
-      {profiles.length === 0 ? (
+      {sortedProfiles.length === 0 ? (
         <p className="text-sm text-muted-foreground">No accounts found.</p>
       ) : (
-        <div className="space-y-2">
-          {profiles.map((p) => {
+        <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
+          {sortedProfiles.map((p) => {
             const draftRole = roleDraft.get(p.id) ?? p.role
+            const sub = subByUserId.get(p.id)
             return (
               <div key={p.id} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{p.full_name ?? 'Unnamed'}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-foreground">{p.full_name ?? 'Unnamed'}</p>
+                    {sub && (
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        sub.status === 'active'
+                          ? 'bg-emerald-900/40 text-emerald-300'
+                          : 'bg-zinc-800 text-zinc-400'
+                      }`}>
+                        {sub.tier}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{p.email}</p>
                   {p.coach_request_pending && (
                     <p className="mt-1 text-xs text-muted-foreground">Coach request pending</p>

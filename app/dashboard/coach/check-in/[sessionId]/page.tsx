@@ -42,7 +42,7 @@ export default async function CheckInPage({ params }: PageProps) {
     .select('athlete_id, checked_in')
     .eq('session_id', sessionId)
 
-  const attendanceMap = new Map<string, boolean>()
+  const attendanceMap = new Map<string, boolean | null>()
   ;(existingAttendance ?? []).forEach((a) => {
     attendanceMap.set(a.athlete_id, a.checked_in)
   })
@@ -51,7 +51,9 @@ export default async function CheckInPage({ params }: PageProps) {
     id: b.profiles?.id ?? b.athlete_id,
     fullName: b.profiles?.full_name ?? 'Unnamed',
     email: b.profiles?.email ?? '',
-    checkedIn: attendanceMap.get(b.athlete_id) ?? false,
+    status: attendanceMap.has(b.athlete_id)
+      ? attendanceMap.get(b.athlete_id) ? 'present' as const : 'absent' as const
+      : 'unmarked' as const,
   }))
 
   return (

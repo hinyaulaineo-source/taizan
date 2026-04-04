@@ -57,16 +57,39 @@ export default async function AdminDashboard() {
     .select('id, full_name, email, role, coach_request_pending')
     .neq('role', 'owner')
 
-  type AthleteRow = { id: string }
-  const athleteIds = (athletes ?? []).map((a: AthleteRow) => a.id)
-  const { data: subscriptions } = athleteIds.length > 0
+  const allProfileIds = [
+    ...(athletes ?? []).map((a) => a.id),
+    ...(accounts ?? []).filter((a) => a.role === 'athlete').map((a) => a.id),
+  ]
+  const uniqueIds = [...new Set(allProfileIds)]
+  const { data: subscriptions } = uniqueIds.length > 0
     ? await supabase
         .from('subscriptions')
         .select('user_id, tier, status')
-        .in('user_id', athleteIds)
+        .in('user_id', uniqueIds)
     : {
         data: [] as Array<{ user_id: string; tier: string; status: string }>
       }
+
+  const subByUserId = new Map<string, { tier: string; status: string }>()
+  ;(subscriptions ?? []).forEach((s) => subByUserId.set(s.user_id, { tier: s.tier, status: s.status }))
+
+  const TIER_SORT: Record<string, number> = {
+    elite: 1,
+    performance_100m: 2,
+    performance_400m: 3,
+    standard: 4,
+    youth_elite: 5,
+    youth_standard: 6,
+  }
+
+  const sortedAthletes = [...(athletes ?? [])].sort((a, b) => {
+    const aTier = subByUserId.get(a.id)?.tier ?? ''
+    const bTier = subByUserId.get(b.id)?.tier ?? ''
+    const aOrder = TIER_SORT[aTier] ?? 99
+    const bOrder = TIER_SORT[bTier] ?? 99
+    return aOrder - bOrder
+  })
 
   const pendingSessionsByCreatedDate = (() => {
     const groups = new Map<string, typeof pendingSessions>()
@@ -150,29 +173,54 @@ export default async function AdminDashboard() {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-base font-semibold text-zinc-100">Athletes</h2>
-        {athletes?.length === 0 && (
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">
+          Athletes
+          <span className="ml-2 text-sm font-normal text-zinc-500">({sortedAthletes.length})</span>
+        </h2>
+        {sortedAthletes.length === 0 && (
           <Card>
             <CardContent>
               <p className="text-sm text-zinc-500">No athletes yet.</p>
             </CardContent>
           </Card>
         )}
-        {athletes?.map(athlete => (
-          <Card key={athlete.id} className="mb-2">
-            <CardContent>
-              <p className="text-sm font-semibold text-zinc-100">{athlete.full_name ?? 'Unnamed'}</p>
-              <p className="text-xs text-zinc-500">{athlete.email}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {sortedAthletes.length > 0 && (
+          <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+            {sortedAthletes.map((athlete) => {
+              const sub = subByUserId.get(athlete.id)
+              return (
+                <Card key={athlete.id}>
+                  <CardContent className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-100">{athlete.full_name ?? 'Unnamed'}</p>
+                      <p className="text-xs text-zinc-500">{athlete.email}</p>
+                    </div>
+                    {sub ? (
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                        sub.status === 'active'
+                          ? 'bg-emerald-900/40 text-emerald-300'
+                          : 'bg-zinc-800 text-zinc-400'
+                      }`}>
+                        {sub.tier} · {sub.status}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-zinc-800 px-2.5 py-1 text-[11px] text-zinc-500">
+                        No subscription
+                      </span>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       <section className="mt-10">
         <h2 className="mb-3 text-base font-semibold text-zinc-100">Manage accounts</h2>
         <Card>
           <CardContent className="p-6">
-            <AccountManager profiles={accounts ?? []} />
+            <AccountManager profiles={accounts ?? []} subscriptions={subscriptions ?? []} />
           </CardContent>
         </Card>
       </section>

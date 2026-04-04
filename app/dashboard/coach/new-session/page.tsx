@@ -8,8 +8,10 @@ export default function NewSessionPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [autoBookAll, setAutoBookAll] = useState(false)
   const [form, setForm] = useState({
     title: '',
+    description: '',
     session_type: 'track_session',
     scheduled_at: '',
     location: '',
@@ -61,6 +63,7 @@ export default function NewSessionPage() {
     const payload = form.recurring
       ? {
           title: form.title,
+          description: form.description,
           session_type: form.session_type,
           start_at: new Date(form.scheduled_at).toISOString(),
           end_date: form.recurrence_end_date,
@@ -72,6 +75,7 @@ export default function NewSessionPage() {
         }
       : {
           title: form.title,
+          description: form.description,
           session_type: form.session_type,
           scheduled_at: new Date(form.scheduled_at).toISOString(),
           location: form.location,
@@ -91,19 +95,28 @@ export default function NewSessionPage() {
       return
     }
 
-    // For single sessions, create optional program after session insert.
-    if (!form.recurring && form.program.trim()) {
+    // For single sessions, handle program + auto-book.
+    if (!form.recurring) {
       const data = (await response.json().catch(() => null)) as { id?: string } | null
       if (data?.id) {
         const supabase = createClient()
         const {
           data: { user },
         } = await supabase.auth.getUser()
-        if (user?.id) {
+
+        if (user?.id && form.program.trim()) {
           await supabase.from('programs').insert({
             session_id: data.id,
             content_md: form.program.trim(),
             created_by: user.id,
+          })
+        }
+
+        if (autoBookAll) {
+          await fetch('/api/bookings/coach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: data.id, bookAllEligible: true, allowedTiers }),
           })
         }
       }
@@ -146,6 +159,14 @@ export default function NewSessionPage() {
         placeholder="e.g. Speed Lab — Wednesday Track"
         value={form.title}
         onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+      />
+
+      <label style={labelStyle}>Session description</label>
+      <textarea
+        style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+        placeholder="What is this session about? e.g. Sprint technique drills focusing on acceleration phase"
+        value={form.description}
+        onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
       />
 
       <label style={labelStyle}>Session type</label>
@@ -219,6 +240,9 @@ export default function NewSessionPage() {
                   background: form.weekdays.includes(Number(day)) ? '#fff' : '#1a1a1a',
                   color: form.weekdays.includes(Number(day)) ? '#000' : '#666',
                   fontSize: '12px',
+                  fontFamily: 'var(--font-geist-mono)',
+                  fontWeight: '900',
+                  boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
                   cursor: 'pointer',
                 }}
               >
@@ -295,6 +319,20 @@ export default function NewSessionPage() {
         onChange={e => setForm(f => ({ ...f, program: e.target.value }))}
       />
 
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: 0 }}>
+          <input
+            type="checkbox"
+            checked={autoBookAll}
+            onChange={(e) => setAutoBookAll(e.target.checked)}
+          />
+          Auto-book all eligible athletes after creation
+        </label>
+        <p style={{ color: '#666', fontSize: '11px', marginTop: '4px', marginLeft: '22px' }}>
+          Books every athlete whose subscription tier matches this session.
+        </p>
+      </div>
+
       {error && (
         <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '16px' }}>{error}</p>
       )}
@@ -310,7 +348,9 @@ export default function NewSessionPage() {
           border: 'none',
           borderRadius: '8px',
           fontSize: '14px',
-          fontWeight: '500',
+          fontFamily: 'var(--font-geist-mono)',
+          fontWeight: '900',
+          boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
           cursor: loading ? 'not-allowed' : 'pointer',
           opacity: loading ? 0.7 : 1,
         }}

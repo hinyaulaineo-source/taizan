@@ -275,24 +275,45 @@ export default async function AthleteDashboard() {
 
       <section className="mt-8">
         <div className="glass-panel min-h-[220px] p-5">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Today</p>
-          <h2 className="mt-2 text-2xl font-bold text-foreground">Today's Session</h2>
-          {eligibleAvailableSessions.length > 0 ? (
-            <>
-              <p className="mt-2 text-sm text-foreground">
-                {(eligibleAvailableSessions[0] as any).title} ·{' '}
-                {new Date((eligibleAvailableSessions[0] as any).scheduled_at).toLocaleString()}
-              </p>
-              <a
-                href={`/dashboard/athlete/session/${(eligibleAvailableSessions[0] as any).id}`}
-                className="accent-btn mt-6 inline-block"
-              >
-                Open Session
-              </a>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-muted-foreground">No eligible session yet.</p>
-          )}
+          {(() => {
+            const now = new Date()
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+            const nextSession = eligibleAvailableSessions.find((s: any) => {
+              const d = new Date(s.scheduled_at)
+              return d >= new Date(todayStr)
+            }) as any | undefined
+            const isToday = nextSession
+              ? new Date(nextSession.scheduled_at).toLocaleDateString('en-CA') === todayStr
+              : false
+            const label = isToday ? 'Today' : 'Upcoming'
+            const heading = isToday ? "Today's Session" : 'Upcoming Session'
+
+            return nextSession ? (
+              <>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+                <h2 className="mt-2 text-2xl font-bold text-foreground">{heading}</h2>
+                <p className="mt-2 text-sm text-foreground">
+                  {nextSession.title} ·{' '}
+                  {new Date(nextSession.scheduled_at).toLocaleDateString('en-GB', {
+                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                </p>
+                <a
+                  href={`/dashboard/athlete/session/${nextSession.id}`}
+                  className="accent-btn mt-6 inline-block"
+                >
+                  Open Session
+                </a>
+              </>
+            ) : (
+              <>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Sessions</p>
+                <h2 className="mt-2 text-2xl font-bold text-foreground">No Upcoming Session</h2>
+                <p className="mt-2 text-sm text-muted-foreground">No eligible session yet.</p>
+              </>
+            )
+          })()}
         </div>
       </section>
 
@@ -345,7 +366,7 @@ export default async function AthleteDashboard() {
             })
           })
 
-          return <Calendar events={events} bookingLink="/dashboard/athlete/book" initialMonth={new Date()} />
+          return <Calendar events={events} bookingLink="/dashboard/athlete/book" weeklyLink="/dashboard/athlete/weekly" initialMonth={new Date()} />
         })()}
       </section>
 
@@ -356,7 +377,11 @@ export default async function AthleteDashboard() {
         )}
         {bookings && bookings.length > 0 && (
           <div className="max-h-[380px] space-y-3 overflow-y-auto pr-1">
-            {bookings.map((b) => (
+            {[...bookings].sort((a, b) => {
+              const aTime = new Date((a.sessions as any)?.scheduled_at ?? 0).getTime()
+              const bTime = new Date((b.sessions as any)?.scheduled_at ?? 0).getTime()
+              return aTime - bTime
+            }).map((b) => (
               <Card key={b.id} className="mb-3">
                 <CardContent>
                   <Link href={`/dashboard/athlete/session/${(b.sessions as any)?.id}`} className="block hover:opacity-90">

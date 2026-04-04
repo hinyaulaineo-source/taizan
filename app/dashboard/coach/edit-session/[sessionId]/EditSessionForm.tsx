@@ -4,17 +4,21 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import DateTimeInput, { DateInput } from '@/components/ui/date-time-input'
+import SessionAthleteBooker from '@/components/coach/SessionAthleteBooker'
 
 export default function EditSessionForm({
   sessionId,
+  batchSessionIds,
   initial,
   initialApplyToBatch = false,
 }: {
   sessionId: string
+  batchSessionIds: string[]
   initialApplyToBatch?: boolean
   initial: {
     id: string
     title: string
+    description: string
     session_type: string
     scheduled_at: string
     location: string
@@ -35,6 +39,7 @@ export default function EditSessionForm({
   const [applyToBatch, setApplyToBatch] = useState(initialApplyToBatch)
   const [form, setForm] = useState({
     title: initial.title,
+    description: initial.description,
     session_type: initial.session_type,
     scheduled_at: initial.scheduled_at,
     location: initial.location,
@@ -89,6 +94,7 @@ export default function EditSessionForm({
     const allowedTiers = form.single_tier_only ? [form.single_tier] : form.allowed_tiers
     const baseUpdates = {
       title: form.title,
+      description: form.description,
       session_type: form.session_type,
       location: form.location,
       allowed_tiers: allowedTiers,
@@ -197,6 +203,7 @@ export default function EditSessionForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: form.title,
+          description: form.description,
           session_type: form.session_type,
           start_at: iso,
           end_date: form.recurrence_end_date,
@@ -367,6 +374,14 @@ export default function EditSessionForm({
         onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
       />
 
+      <label style={labelStyle}>Session description</label>
+      <textarea
+        style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+        placeholder="What is this session about?"
+        value={form.description}
+        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+      />
+
       <label style={labelStyle}>Session type</label>
       <select
         style={inputStyle}
@@ -447,6 +462,9 @@ export default function EditSessionForm({
                   background: form.weekdays.includes(day) ? '#fff' : '#1a1a1a',
                   color: form.weekdays.includes(day) ? '#000' : '#666',
                   fontSize: '12px',
+                  fontFamily: 'var(--font-geist-mono)',
+                  fontWeight: '900',
+                  boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
                   cursor: 'pointer',
                 }}
               >
@@ -497,7 +515,9 @@ export default function EditSessionForm({
               color: form.allowed_tiers.includes(tier) ? '#000' : '#666',
               fontSize: '12px',
               cursor: 'pointer',
-              fontWeight: form.allowed_tiers.includes(tier) ? '500' : '400',
+              fontFamily: 'var(--font-geist-mono)',
+              fontWeight: '900',
+              boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
             }}
           >
             {tier}
@@ -537,7 +557,9 @@ export default function EditSessionForm({
           border: 'none',
           borderRadius: '8px',
           fontSize: '14px',
-          fontWeight: '500',
+          fontFamily: 'var(--font-geist-mono)',
+          fontWeight: '900',
+          boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
             cursor: loading || deleting || cancelling ? 'not-allowed' : 'pointer',
             opacity: loading || deleting || cancelling ? 0.7 : 1,
         }}
@@ -558,6 +580,9 @@ export default function EditSessionForm({
             border: '1px solid #333',
             borderRadius: '8px',
             fontSize: '13px',
+            fontFamily: 'var(--font-geist-mono)',
+            fontWeight: '900',
+            boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
             cursor: loading || deleting || cancelling ? 'not-allowed' : 'pointer',
             opacity: loading || deleting || cancelling ? 0.7 : 1,
           }}
@@ -576,6 +601,9 @@ export default function EditSessionForm({
             border: '1px solid #f59e0b',
             borderRadius: '8px',
             fontSize: '13px',
+            fontFamily: 'var(--font-geist-mono)',
+            fontWeight: '900',
+            boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
             cursor: loading || deleting || cancelling ? 'not-allowed' : 'pointer',
             opacity: loading || deleting || cancelling ? 0.7 : 1,
           }}
@@ -594,6 +622,9 @@ export default function EditSessionForm({
             border: '1px solid #333',
             borderRadius: '8px',
             fontSize: '13px',
+            fontFamily: 'var(--font-geist-mono)',
+            fontWeight: '900',
+            boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
             cursor: loading || deleting || cancelling ? 'not-allowed' : 'pointer',
             opacity: loading || deleting || cancelling ? 0.7 : 1,
           }}
@@ -612,6 +643,9 @@ export default function EditSessionForm({
             border: '1px solid #f87171',
             borderRadius: '8px',
             fontSize: '13px',
+            fontFamily: 'var(--font-geist-mono)',
+            fontWeight: '900',
+            boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
             cursor: loading || deleting || cancelling ? 'not-allowed' : 'pointer',
             opacity: loading || deleting || cancelling ? 0.7 : 1,
           }}
@@ -619,6 +653,11 @@ export default function EditSessionForm({
           {deleting ? 'Deleting batch...' : 'Delete entire created-at batch'}
         </button>
       </div>
+
+      <SessionAthleteBooker
+        sessionIds={applyToBatch ? batchSessionIds : [sessionId]}
+        allowedTiers={form.single_tier_only ? [form.single_tier] : form.allowed_tiers}
+      />
     </div>
   )
 }

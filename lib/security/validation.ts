@@ -17,7 +17,14 @@ const safeString = (max = 500) => z.string().max(max).trim()
 const email = z.string().email().max(320).trim().toLowerCase()
 
 const VALID_ROLES = ['athlete', 'parent', 'coach'] as const
-const SUBSCRIPTION_TIERS = ['standard', 'performance_100m', 'performance_400m', 'elite', 'youth_standard', 'youth_elite'] as const
+export const SUBSCRIPTION_TIERS = [
+  'standard',
+  'performance_100m',
+  'performance_400m',
+  'elite',
+  'youth_standard',
+  'youth_elite',
+] as const
 const SUBSCRIPTION_STATUSES = ['active', 'inactive'] as const
 const SESSION_STATUSES_PATCH = ['draft', 'published', 'cancelled'] as const
 const SESSION_TYPES = ['track_session', 'gym_session', 'recovery', 'strength'] as const
@@ -61,6 +68,7 @@ export const personalBestSchema = z.object({
 
 export const sessionCreateSchema = z.object({
   title: safeString(200).min(1),
+  description: safeString(2000).default(''),
   session_type: z.enum(SESSION_TYPES).default('track_session'),
   scheduled_at: z.string().min(1),
   location: safeString(500).default(''),
@@ -75,6 +83,7 @@ export const sessionPatchSchema = z.object({
 
 export const sessionRecurringSchema = z.object({
   title: safeString(200).min(1),
+  description: safeString(2000).default(''),
   session_type: z.enum(SESSION_TYPES).default('track_session'),
   start_at: z.string().min(1),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -100,6 +109,29 @@ export const bulkBookingSchema = z.object({
 export const cancelBookingSchema = z.object({
   sessionId: uuid,
 }).strict()
+
+export const coachBookingSchema = z.object({
+  sessionId: uuid.optional(),
+  sessionIds: z.array(uuid).min(1).max(200).optional(),
+  athleteIds: z.array(uuid).min(1).max(200).optional(),
+  bookAllEligible: z.boolean().optional(),
+  allowedTiers: z.array(z.enum(SUBSCRIPTION_TIERS)).optional(),
+}).strict().refine(
+  (d) => d.sessionId || (d.sessionIds && d.sessionIds.length > 0),
+  { message: 'Provide sessionId or sessionIds' },
+).refine(
+  (d) => d.bookAllEligible || (d.athleteIds && d.athleteIds.length > 0),
+  { message: 'Provide athleteIds or set bookAllEligible to true' },
+)
+
+export const coachUnbookSchema = z.object({
+  sessionId: uuid.optional(),
+  sessionIds: z.array(uuid).min(1).max(200).optional(),
+  athleteIds: z.array(uuid).min(1).max(200),
+}).strict().refine(
+  (d) => d.sessionId || (d.sessionIds && d.sessionIds.length > 0),
+  { message: 'Provide sessionId or sessionIds' },
+)
 
 // ────────────────────────────────────────────────
 // Parent bookings
@@ -137,6 +169,11 @@ export const attendanceBatchSchema = z.object({
   })).min(1).max(200),
 }).strict()
 
+export const attendanceSelfSchema = z.object({
+  sessionId: uuid,
+  checkedIn: z.boolean(),
+}).strict()
+
 // ────────────────────────────────────────────────
 // Admin
 // ────────────────────────────────────────────────
@@ -164,6 +201,12 @@ export const subscriptionSchema = z.object({
 export const parentLinkSchema = z.object({
   parentId: uuid,
   athleteId: uuid,
+}).strict()
+
+export const stripeCheckoutSchema = z.object({
+  tier: z.enum(SUBSCRIPTION_TIERS),
+  /** Stripe Price ID; must appear in STRIPE_PRICE_ALLOWLIST (comma-separated env). */
+  priceId: z.string().min(1).max(128),
 }).strict()
 
 // ────────────────────────────────────────────────

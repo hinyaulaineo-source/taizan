@@ -5,6 +5,7 @@ import { canAccessAthleteDashboard } from '@/lib/auth/roles'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import CancelBookingButton from './CancelBookingButton'
+import SelfCheckInButton from './SelfCheckInButton'
 
 interface PageProps {
   params: Promise<{ sessionId: string }>
@@ -28,7 +29,7 @@ export default async function AthleteSessionDetailsPage({ params }: PageProps) {
 
   const { data: booking } = await supabase
     .from('bookings')
-    .select('status, booked_at, sessions(id, title, session_type, location, scheduled_at, max_athletes, programs(content_md))')
+    .select('status, booked_at, sessions(id, title, description, session_type, location, scheduled_at, max_athletes, programs(content_md))')
     .eq('athlete_id', user.id)
     .eq('session_id', sessionId)
     .maybeSingle()
@@ -37,6 +38,15 @@ export default async function AthleteSessionDetailsPage({ params }: PageProps) {
 
   const session = booking.sessions as any
   const statusTone = booking.status === 'booked' ? 'success' : 'neutral'
+
+  const { data: attendance } = await supabase
+    .from('attendance')
+    .select('checked_in')
+    .eq('session_id', sessionId)
+    .eq('athlete_id', user.id)
+    .maybeSingle()
+
+  const selfCheckedIn: boolean | null = attendance ? attendance.checked_in : null
 
   return (
     <main className="mx-auto max-w-3xl">
@@ -53,6 +63,13 @@ export default async function AthleteSessionDetailsPage({ params }: PageProps) {
             <h2 className="text-lg font-semibold text-foreground">{session.title}</h2>
             <Badge tone={statusTone}>{booking.status}</Badge>
           </div>
+
+          {session.description ? (
+            <div className="rounded-lg border border-border bg-background p-3">
+              <p className="mb-1 text-xs text-muted-foreground">About this session</p>
+              <p className="whitespace-pre-wrap text-sm text-foreground">{session.description}</p>
+            </div>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-border bg-card p-3">
@@ -95,6 +112,9 @@ export default async function AthleteSessionDetailsPage({ params }: PageProps) {
             Booked on: {new Date(booking.booked_at).toLocaleString('en-GB')}
           </p>
 
+          {booking.status === 'booked' && (
+            <SelfCheckInButton sessionId={session.id} initialCheckedIn={selfCheckedIn} />
+          )}
           {booking.status === 'booked' ? <CancelBookingButton sessionId={session.id} /> : null}
         </CardContent>
       </Card>

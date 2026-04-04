@@ -40,7 +40,7 @@ const CalendarDay: React.FC<{
       onClick={onClick}
       className={`col-span-1 row-span-1 flex h-8 w-8 items-center justify-center ${base} ${cellBg} border border-transparent hover:border-border`}
     >
-      <span className="font-medium text-sm">{day}</span>
+      <span className="font-black text-sm">{day}</span>
     </button>
   )
 }
@@ -58,10 +58,12 @@ export type CalendarEvent = {
 export function Calendar({
   events = [],
   bookingLink = '/dashboard',
+  weeklyLink,
   initialMonth = new Date(),
 }: {
   events?: CalendarEvent[]
   bookingLink?: string
+  weeklyLink?: string
   initialMonth?: Date
 }) {
   const router = useRouter()
@@ -134,10 +136,17 @@ export function Calendar({
           <p className="mt-1 text-xs md:text-sm text-muted-foreground">
             Click a day to see sessions. Colors: indigo = sessions available, green = booked.
           </p>
-          <div className="mt-3">
+          <div className="mt-3 flex gap-2">
             <Link href={bookingLink}>
               <Button className="bg-white text-zinc-800 hover:bg-zinc-200">Book Now</Button>
             </Link>
+            {weeklyLink && (
+              <Link href={weeklyLink}>
+                <Button variant="outline" className="text-foreground">
+                  Weekly View
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
 

@@ -58,7 +58,9 @@ export default function BookingButton({
           border: 'none',
           borderRadius: '8px',
           fontSize: '14px',
-          fontWeight: '500',
+          fontFamily: 'var(--font-geist-mono)',
+          fontWeight: '900',
+          boxShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
           cursor: disabled || alreadyBooked || loading ? 'not-allowed' : 'pointer',
           opacity: disabled || alreadyBooked || loading ? 0.6 : 1,
         }}

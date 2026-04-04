@@ -28,7 +28,7 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('id, title, session_type, scheduled_at, location, allowed_tiers, max_athletes, status, created_by, created_at')
+    .select('id, title, description, session_type, scheduled_at, location, allowed_tiers, max_athletes, status, created_by, created_at')
     .eq('id', sessionId)
     .single()
 
@@ -43,6 +43,18 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
     .eq('session_id', sessionId)
     .maybeSingle()
 
+  let batchSessionIds: string[] = [session.id]
+  if (batch === '1') {
+    const { data: batchSessions } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('created_by', session.created_by)
+      .eq('created_at', session.created_at)
+    if (batchSessions && batchSessions.length > 0) {
+      batchSessionIds = batchSessions.map((s) => s.id)
+    }
+  }
+
   return (
     <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '2rem' }}>
@@ -54,9 +66,11 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
 
       <EditSessionForm
         sessionId={session.id}
+        batchSessionIds={batchSessionIds}
         initial={{
           id: session.id,
           title: session.title ?? '',
+          description: (session as any).description ?? '',
           session_type: session.session_type ?? 'track_session',
           scheduled_at: session.scheduled_at ? new Date(session.scheduled_at).toISOString().slice(0, 16) : '',
           location: session.location ?? '',
