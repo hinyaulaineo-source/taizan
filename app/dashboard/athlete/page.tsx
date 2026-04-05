@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getProfileRowWithOptionalPrimaryCoach } from '@/lib/supabase/profile-row'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
@@ -14,14 +15,24 @@ export default async function AthleteDashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, full_name, avatar_url, main_events')
-    .eq('id', user.id)
-    .single()
+  const profile = await getProfileRowWithOptionalPrimaryCoach(supabase, user.id)
+
+  const { data: primaryCoachProfile } =
+    profile?.primary_coach_id && isAthleteRole(profile?.role)
+      ? await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', profile.primary_coach_id)
+          .maybeSingle()
+      : { data: null as { full_name: string | null; email: string } | null }
 
   const role = normalizeRole(profile?.role)
-  if (!canAccessAthleteDashboard(profile?.role)) redirect('/dashboard')
+  if (!canAccessAthleteDashboard(profile?.role)) {
+    if (role === 'coach') redirect('/dashboard/coach')
+    if (role === 'parent') redirect('/dashboard/parent')
+    if (role === 'owner') redirect('/dashboard/admin')
+    redirect('/dashboard')
+  }
 
   const ownerPreview = isOwnerLike(profile?.role) && !isAthleteRole(profile?.role)
 
@@ -184,6 +195,14 @@ export default async function AthleteDashboard() {
               </div>
             ) : null}
             <p className="mt-1 text-sm text-muted-foreground">Fall 7, get up 8.</p>
+            {primaryCoachProfile ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Coach: </span>
+                {primaryCoachProfile.full_name?.trim()
+                  ? primaryCoachProfile.full_name
+                  : primaryCoachProfile.email}
+              </p>
+            ) : null}
           </div>
         </div>
         <Badge tone={tierTone}>{tierLabel}</Badge>

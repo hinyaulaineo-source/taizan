@@ -16,6 +16,10 @@ begin
   if not exists (select 1 from pg_type where typname = 'subscription_tier') then
     create type public.subscription_tier as enum ('standard', 'performance', 'performance_100m', 'performance_400m', 'elite', 'youth_standard', 'youth_elite');
   end if;
+
+  if not exists (select 1 from pg_type where typname = 'coach_tier') then
+    create type public.coach_tier as enum ('senior_coach', 'coach_assistant', 'junior_coach');
+  end if;
 end $$;
 
 create table if not exists public.profiles (
@@ -28,6 +32,8 @@ create table if not exists public.profiles (
   role public.user_role not null default 'athlete',
   coach_request_pending boolean not null default false,
   coach_requested_at timestamptz,
+  primary_coach_id uuid references public.profiles(id) on delete set null,
+  coach_tier public.coach_tier,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -129,15 +135,50 @@ alter table public.personal_bests enable row level security;
 alter table public.attendance enable row level security;
 alter table public.parent_athlete_links enable row level security;
 
+-- Profiles helpers (avoid RLS recursion: never SELECT profiles inside profiles policies)
+create or replace function public.profiles_role(user_id uuid)
+returns public.user_role
+language plpgsql
+security definer
+set search_path to public
+stable
+as $fn$
+begin
+  return (select p.role from public.profiles p where p.id = user_id limit 1);
+end;
+$fn$;
+
+create or replace function public.profiles_primary_coach_id(user_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path to public
+stable
+as $fn$
+begin
+  return (select p.primary_coach_id from public.profiles p where p.id = user_id limit 1);
+end;
+$fn$;
+
+revoke all on function public.profiles_role(uuid) from PUBLIC;
+revoke all on function public.profiles_primary_coach_id(uuid) from PUBLIC;
+
+grant execute on function public.profiles_role(uuid) to authenticated, service_role;
+grant execute on function public.profiles_primary_coach_id(uuid) to authenticated, service_role;
+
 -- Profiles
 drop policy if exists "profiles read own or privileged" on public.profiles;
 create policy "profiles read own or privileged" on public.profiles
 for select using (
-  id = auth.uid() or
-  exists (
-    select 1 from public.profiles viewer
-    where viewer.id = auth.uid() and viewer.role in ('owner', 'coach')
-  )
+  id = auth.uid()
+  or public.profiles_role(auth.uid()) in ('owner', 'coach')
+);
+
+drop policy if exists "profiles read assigned coach as athlete" on public.profiles;
+create policy "profiles read assigned coach as athlete" on public.profiles
+for select using (
+  public.profiles_role(auth.uid()) = 'athlete'
+  and public.profiles_primary_coach_id(auth.uid()) = profiles.id
 );
 
 drop policy if exists "profiles insert own row" on public.profiles;
@@ -146,23 +187,20 @@ for insert with check (id = auth.uid());
 
 drop policy if exists "profiles update own row or owner" on public.profiles;
 create policy "profiles update own row or owner" on public.profiles
-for update using (
-  id = auth.uid() or
-  exists (
-    select 1 from public.profiles viewer
-    where viewer.id = auth.uid() and viewer.role = 'owner'
-  )
+for update
+using (
+  id = auth.uid()
+  or public.profiles_role(auth.uid()) = 'owner'
+)
+with check (
+  id = auth.uid()
+  or public.profiles_role(auth.uid()) = 'owner'
 );
 
 -- Profiles delete
 drop policy if exists "profiles delete by owner" on public.profiles;
 create policy "profiles delete by owner" on public.profiles
-for delete using (
-  exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid() and p.role = 'owner'
-  )
-);
+for delete using (public.profiles_role(auth.uid()) = 'owner');
 
 -- Sessions
 drop policy if exists "sessions read by role and status" on public.sessions;

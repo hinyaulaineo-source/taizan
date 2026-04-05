@@ -26,6 +26,13 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 Use your deployed site URL for production (e.g. `https://your-app.vercel.app`). Add that URL and wildcard preview URLs under **Supabase → Authentication → URL Configuration** so redirects work.
 
+For **password reset**, add these to **Redirect URLs** (replace with your real origins):
+
+- `http://localhost:3000/reset-password`
+- `https://<your-production-domain>/reset-password`
+
+`forgot-password` uses `resetPasswordForEmail` with `redirectTo` set to `/reset-password` on the same origin as the user.
+
 ### Server-only (Supabase admin + cron + billing)
 
 ```bash
@@ -50,11 +57,22 @@ STRIPE_PRICE_ALLOWLIST=
 RESEND_API_KEY=
 RESEND_FROM_EMAIL="TrackZAN <onboarding@resend.dev>"
 
+# Supabase Auth → Send Email hook → `POST /api/auth/send-email`(secret from dashboard)
+SEND_EMAIL_HOOK_SECRET=
+
 # Roster CSV: minimum ref-no / password length (default 6)
 CSV_MIN_PASSWORD_LENGTH=6
 ```
 
-Never expose `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, or `CRON_SECRET` to the browser.
+Never expose `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `CRON_SECRET`, or `SEND_EMAIL_HOOK_SECRET` to the browser.
+
+### Supabase Send Email hook (branded auth mail)
+
+Auth emails (invite, signup confirm, magic link, password reset, etc.) can be sent through this app via Resend and [React Email](https://react.email) templates under `emails/`.
+
+1. Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. Use a [sender on a domain you verify in Resend](https://resend.com/docs/dashboard/domains/introduction); Supabase may reject unauthenticated `From` addresses.
+2. In **Supabase → Authentication → Hooks → Send Email**, turn on the hook. Set **HTTP Request URL** to `https://<your-production-domain>/api/auth/send-email` (and a preview URL for Preview deployments if you test there).
+3. Copy the hook signing secret into `SEND_EMAIL_HOOK_SECRET`. The dashboard may show `v1,whsec_...`; the handler accepts that form or a raw secret.
 
 ## 2) Database Setup
 
@@ -111,6 +129,7 @@ npm run build
 | `POST /api/admin/sync-google-sheet` | Owner UI: upload roster CSV (same as before). |
 | `GET /api/cron/roster-sync` | Cron: fetch `ROSTER_CSV_URL`, sync athletes(`Bearer CRON_SECRET`). |
 | `GET /api/cron/session-reminders` | Cron: email ~24h reminders(`Bearer CRON_SECRET`; requires Resend env). |
+| `POST /api/auth/send-email` | Supabase **Send Email** hook: verify `SEND_EMAIL_HOOK_SECRET`, send auth templates via Resend. |
 | `POST /api/billing/checkout` | JSON `{ "tier", "priceId" }` — returns Stripe Checkout `url`. |
 | `POST /api/webhooks/stripe` | Stripe → upsert `public.subscriptions`. |
 

@@ -10,7 +10,10 @@ type ProfileRow = {
   email: string
   role: string
   coach_request_pending: boolean
+  primary_coach_id: string | null
 }
+
+type CoachOption = { id: string; full_name: string | null; email: string }
 
 const ROLE_OPTIONS = [
   { value: 'athlete', label: 'Athlete' },
@@ -23,12 +26,15 @@ type SubRow = { user_id: string; tier: string; status: string }
 export default function AccountManager({
   profiles,
   subscriptions = [],
+  coaches = [],
 }: {
   profiles: ProfileRow[]
   subscriptions?: SubRow[]
+  coaches?: CoachOption[]
 }) {
   const router = useRouter()
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [savingCoachForId, setSavingCoachForId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
 
@@ -89,6 +95,29 @@ export default function AccountManager({
     }
   }
 
+  async function updatePrimaryCoach(athleteId: string, coachId: string | null) {
+    setSavingCoachForId(athleteId)
+    setError('')
+    try {
+      const res = await fetch('/api/admin/athlete-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athleteId, coachId }),
+      })
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) {
+        setError(data?.error ? data.error : `Failed to assign coach (HTTP ${res.status}).`)
+        setSavingCoachForId(null)
+        return
+      }
+      router.refresh()
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setSavingCoachForId(null)
+    }
+  }
+
   async function deleteAccount(profileId: string) {
     if (!window.confirm('Delete this account? This cannot be undone.')) return
     setDeletingId(profileId)
@@ -122,6 +151,7 @@ export default function AccountManager({
           {sortedProfiles.map((p) => {
             const draftRole = roleDraft.get(p.id) ?? p.role
             const sub = subByUserId.get(p.id)
+            const showCoachAssign = draftRole === 'athlete'
             return (
               <div key={p.id} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0 flex-1">
@@ -141,6 +171,29 @@ export default function AccountManager({
                   {p.coach_request_pending && (
                     <p className="mt-1 text-xs text-muted-foreground">Coach request pending</p>
                   )}
+                  {showCoachAssign ? (
+                    <div className="mt-2 flex max-w-md flex-col gap-1">
+                      <label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Primary coach
+                      </label>
+                      <select
+                        className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground"
+                        value={p.primary_coach_id ?? ''}
+                        disabled={savingCoachForId === p.id}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          void updatePrimaryCoach(p.id, raw === '' ? null : raw)
+                        }}
+                      >
+                        <option value="">Unassigned</option>
+                        {coaches.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.full_name?.trim() ? c.full_name : c.email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">

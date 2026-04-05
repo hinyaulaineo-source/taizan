@@ -71,5 +71,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/signup'],
+  // Include `/dashboard` explicitly — some matcher versions treat `/dashboard/:path*` as subpaths only.
+  matcher: ['/dashboard', '/dashboard/:path*', '/login', '/signup'],
 }

@@ -1,7 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { normalizeRole } from '@/lib/auth/roles'
+import { DEFAULT_COACH_TIER } from '@/lib/coach-tier'
+import {
+  adminDbErrorResponse,
+  adminEnvMissingResponse,
+  createAdminClientOrNull,
+  isCoachTierColumnError,
+} from '@/lib/supabase/admin-helpers'
 import { NextResponse } from 'next/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { accountIdentitySchema, parseBody } from '@/lib/security/validation'
 
@@ -45,27 +51,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'profileId and valid role are required.' }, { status: 400 })
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) {
-    return NextResponse.json(
-      { error: 'Server configuration error.' },
-      { status: 500 },
-    )
-  }
+  const admin = createAdminClientOrNull()
+  if (!admin) return adminEnvMissingResponse()
 
-  const admin = createSupabaseClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-
-  const { data: existing, error: readErr } = await admin
+  let { data: existing, error: readErr } = await admin
     .from('profiles')
-    .select('id, role, coach_request_pending')
+    .select('id, role, coach_request_pending, coach_tier')
     .eq('id', profileId)
     .maybeSingle()
 
+  if (readErr && isCoachTierColumnError(readErr)) {
+    const retry = await admin
+      .from('profiles')
+      .select('id, role, coach_request_pending')
+      .eq('id', profileId)
+      .maybeSingle()
+    existing = retry.data
+    readErr = retry.error
+  }
+
   if (readErr) {
-    return NextResponse.json({ error: 'Service configuration error' }, { status: 500 })
+    return adminDbErrorResponse(readErr)
   }
 
   if (!existing) {
@@ -75,11 +81,32 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data: updated, error } = await admin
+  const updatePayload: Record<string, unknown> = {
+    role,
+    coach_request_pending: false,
+  }
+
+  if (role === 'coach' && !(existing as { coach_tier?: string | null }).coach_tier) {
+    updatePayload.coach_tier = DEFAULT_COACH_TIER
+  } else if (normalizeRole(existing.role) === 'coach' && role !== 'coach') {
+    updatePayload.coach_tier = null
+  }
+
+  let { data: updated, error } = await admin
     .from('profiles')
-    .update({ role })
+    .update(updatePayload)
     .eq('id', profileId)
     .select('id, role')
+
+  if (error && isCoachTierColumnError(error) && 'coach_tier' in updatePayload) {
+    const withoutTier = { ...updatePayload }
+    delete withoutTier.coach_tier
+    ;({ data: updated, error } = await admin
+      .from('profiles')
+      .update(withoutTier)
+      .eq('id', profileId)
+      .select('id, role'))
+  }
 
   if (error) {
     return NextResponse.json({ error: `Update failed: ${error.message}` }, { status: 500 })
@@ -91,18 +118,6 @@ export async function POST(request: Request) {
         error:
           `Row exists (current role=${existing.role}) but UPDATE returned 0 rows. Update failed unexpectedly.`,
       },
-      { status: 500 },
-    )
-  }
-
-  const clearPending = await admin
-    .from('profiles')
-    .update({ coach_request_pending: false })
-    .eq('id', profileId)
-
-  if (clearPending.error) {
-    return NextResponse.json(
-      { error: `Role updated to ${role} but clearing coach_request_pending failed: ${clearPending.error.message}` },
       { status: 500 },
     )
   }

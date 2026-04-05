@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { isOwnerLike } from '@/lib/auth/roles'
+import { isCoachTierColumnError } from '@/lib/supabase/admin-helpers'
 import { redirect } from 'next/navigation'
 import ApprovalButtons from './sessions/ApprovalButtons'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,6 +9,7 @@ import SubscriptionManagerForm from './SubscriptionManagerForm'
 import SheetSyncForm from './SheetSyncForm'
 import CoachApprovalForm from './CoachApprovalForm'
 import AccountManager from './AccountManager'
+import CoachManager from './CoachManager'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,10 +38,26 @@ export default async function AdminDashboard() {
     .select('*')
     .eq('role', 'athlete')
 
-  const { data: coaches } = await supabase
+  const coachListRes = await supabase
     .from('profiles')
-    .select('*')
-    .eq('role', 'coach')
+    .select('id, full_name, email, role, coach_tier')
+    .in('role', ['coach', 'owner'])
+    .order('full_name', { ascending: true })
+
+  let coachOrOwnerProfiles = coachListRes.data ?? []
+  if (coachListRes.error && !isCoachTierColumnError(coachListRes.error)) {
+    console.error('Owner dashboard: coach list query failed:', coachListRes.error.message)
+  }
+  if (coachListRes.error && isCoachTierColumnError(coachListRes.error)) {
+    const { data: withoutTier } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, role')
+      .in('role', ['coach', 'owner'])
+      .order('full_name', { ascending: true })
+    coachOrOwnerProfiles = (withoutTier ?? []).map((p) => ({ ...p, coach_tier: null as string | null }))
+  }
+
+  const coaches = coachOrOwnerProfiles.filter((p) => p.role === 'coach')
 
   const { data: coachRequests } = await supabase
     .from('profiles')
@@ -54,7 +72,7 @@ export default async function AdminDashboard() {
 
   const { data: accounts } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role, coach_request_pending')
+    .select('id, full_name, email, role, coach_request_pending, primary_coach_id')
     .neq('role', 'owner')
 
   const allProfileIds = [
@@ -174,6 +192,25 @@ export default async function AdminDashboard() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-base font-semibold text-zinc-100">
+          Manage coaches
+          <span className="ml-2 text-sm font-normal text-zinc-500">({coaches?.length ?? 0})</span>
+        </h2>
+        <Card>
+          <CardContent className="p-6">
+            <CoachManager
+              coaches={(coaches ?? []).map((c) => ({
+                id: c.id,
+                full_name: c.full_name,
+                email: c.email,
+                coach_tier: c.coach_tier ?? null,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">
           Athletes
           <span className="ml-2 text-sm font-normal text-zinc-500">({sortedAthletes.length})</span>
         </h2>
@@ -220,7 +257,15 @@ export default async function AdminDashboard() {
         <h2 className="mb-3 text-base font-semibold text-zinc-100">Manage accounts</h2>
         <Card>
           <CardContent className="p-6">
-            <AccountManager profiles={accounts ?? []} subscriptions={subscriptions ?? []} />
+            <AccountManager
+              profiles={accounts ?? []}
+              subscriptions={subscriptions ?? []}
+              coaches={(coachOrOwnerProfiles ?? []).map((c) => ({
+                id: c.id,
+                full_name: c.full_name,
+                email: c.email,
+              }))}
+            />
           </CardContent>
         </Card>
       </section>

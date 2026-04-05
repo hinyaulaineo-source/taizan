@@ -1,26 +1,46 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [passwordResetOk, setPasswordResetOk] = useState(false)
   const supabase = createClient()
 
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    setPasswordResetOk(q.get('reset') === 'success')
+  }, [])
+
   async function handleLogin() {
-    setLoading(true)
-    setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
-      setLoading(false)
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !password) {
+      setError('Enter your email and password.')
       return
     }
-    router.push('/dashboard')
+    setLoading(true)
+    setError('')
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      })
+      if (signInError) {
+        setError(signInError.message)
+        setLoading(false)
+        return
+      }
+      // Hard navigation: sends cookies set by the browser Supabase client on the next request.
+      // Do not use router.refresh() here — it can hang and block navigation.
+      window.location.replace('/dashboard')
+    } catch {
+      setError('Something went wrong. Check your connection and try again.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,6 +65,19 @@ export default function LoginPage() {
         <p style={{ color: '#666', fontSize: '14px', marginBottom: '2rem' }}>
           The Basecamp. Sign in to continue.
         </p>
+
+        {passwordResetOk ? (
+          <p
+            style={{
+              color: '#86efac',
+              fontSize: '13px',
+              marginBottom: '16px',
+              lineHeight: 1.5,
+            }}
+          >
+            Your password was updated. Sign in with your new password.
+          </p>
+        ) : null}
 
         <div style={{ marginBottom: '12px' }}>
           <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Email</label>
@@ -87,12 +120,19 @@ export default function LoginPage() {
           />
         </div>
 
+        <p style={{ marginBottom: '16px', textAlign: 'right' }}>
+          <Link href="/forgot-password" style={{ color: '#aaa', fontSize: '13px', textDecoration: 'underline' }}>
+            Forgot password?
+          </Link>
+        </p>
+
         {error && (
           <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '16px' }}>{error}</p>
         )}
 
         <button
-          onClick={handleLogin}
+          type="button"
+          onClick={() => void handleLogin()}
           disabled={loading}
           style={{
             width: '100%',
@@ -114,9 +154,9 @@ export default function LoginPage() {
 
         <p style={{ color: '#888', fontSize: '13px', marginTop: '14px', textAlign: 'center' }}>
           New here?{' '}
-          <a href="/signup" style={{ color: '#fff', textDecoration: 'underline' }}>
+          <Link href="/signup" style={{ color: '#fff', textDecoration: 'underline' }}>
             Create an account
-          </a>
+          </Link>
         </p>
       </div>
     </div>

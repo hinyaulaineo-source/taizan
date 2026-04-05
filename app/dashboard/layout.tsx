@@ -30,11 +30,13 @@ export default async function DashboardLayout({
     owner: [
       { href: '/dashboard/admin', label: 'Owner Dashboard' },
       { href: '/dashboard/coach', label: 'Coach View' },
+      { href: '/dashboard/coach/profile', label: 'Coach profile' },
       { href: '/dashboard/athlete', label: 'Athlete View' },
       { href: '/dashboard/parent', label: 'Parent View' },
     ],
     coach: [
       { href: '/dashboard/coach', label: 'Coach Dashboard' },
+      { href: '/dashboard/coach/profile', label: 'My profile' },
       { href: '/dashboard/coach/weekly', label: 'Weekly Schedule' },
       { href: '/dashboard/coach/new-session', label: 'New Session' },
       { href: '/dashboard/coach/feedback', label: 'Add Feedback' },
@@ -83,7 +85,7 @@ export default async function DashboardLayout({
                 <div className="hidden items-center gap-2 md:flex">
                   <Link
                     href="/dashboard"
-                    className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-accent"
+                    className="rounded-md border border-border px-3 py-1.5 text-sm font-black text-foreground hover:bg-accent"
                   >
                     Home
                   </Link>

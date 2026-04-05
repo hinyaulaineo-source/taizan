@@ -30,10 +30,16 @@ export default function AthleteProfileForm({
   initialFullName,
   initialAvatarUrl,
   initialMainEvents,
+  hideMainEvents = false,
+  patchPath,
 }: {
   initialFullName: string | null
   initialAvatarUrl: string | null
   initialMainEvents: string[]
+  /** Omit main events (e.g. coach self-service profile). */
+  hideMainEvents?: boolean
+  /** Defaults to `/api/profile`; use `/api/coach/athletes/:id` when editing an assigned athlete. */
+  patchPath?: string
 }) {
   const router = useRouter()
   const [fullName, setFullName] = useState(initialFullName ?? '')
@@ -49,14 +55,18 @@ export default function AthleteProfileForm({
     setSaving(true)
     setError('')
     setMessage('')
-    const res = await fetch('/api/profile', {
+    const path = patchPath ?? '/api/profile'
+    const payload: Record<string, unknown> = {
+      full_name: fullName.trim() || null,
+      avatar_url: avatarUrl.trim() || null,
+    }
+    if (!hideMainEvents) {
+      payload.main_events = mainEvents
+    }
+    const res = await fetch(path, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        full_name: fullName.trim() || null,
-        avatar_url: avatarUrl.trim() || null,
-        main_events: mainEvents,
-      }),
+      body: JSON.stringify(payload),
     })
     const data = (await res.json().catch(() => null)) as { error?: string } | null
     if (!res.ok) {
@@ -95,8 +105,8 @@ export default function AthleteProfileForm({
         return
       }
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `${user.id}/${Date.now()}-${safeName}`
-      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
+      const storagePath = `${user.id}/${Date.now()}-${safeName}`
+      const { error: upErr } = await supabase.storage.from('avatars').upload(storagePath, file, {
         upsert: true,
       })
       if (upErr) {
@@ -107,7 +117,7 @@ export default function AthleteProfileForm({
         setUploading(false)
         return
       }
-      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path)
+      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(storagePath)
       setAvatarUrl(pub.publicUrl)
       setMessage('Image uploaded — click Save profile to store it.')
     } catch (err: unknown) {
@@ -176,25 +186,27 @@ export default function AthleteProfileForm({
         />
       </div>
 
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Main events (choose more than one)</p>
-        <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-zinc-700 bg-zinc-950 p-3">
-          {MAIN_EVENT_OPTIONS.map((eventName) => {
-            const checked = mainEvents.includes(eventName)
-            return (
-              <label key={eventName} className="flex items-center gap-2 text-sm text-zinc-200">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleMainEvent(eventName)}
-                  className="h-4 w-4 accent-white"
-                />
-                <span>{eventName}</span>
-              </label>
-            )
-          })}
+      {!hideMainEvents ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Main events (choose more than one)</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-zinc-700 bg-zinc-950 p-3">
+            {MAIN_EVENT_OPTIONS.map((eventName) => {
+              const checked = mainEvents.includes(eventName)
+              return (
+                <label key={eventName} className="flex items-center gap-2 text-sm text-zinc-200">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleMainEvent(eventName)}
+                    className="h-4 w-4 accent-white"
+                  />
+                  <span>{eventName}</span>
+                </label>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
       {message && <p className="text-sm text-emerald-400">{message}</p>}

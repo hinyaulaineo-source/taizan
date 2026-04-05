@@ -1,7 +1,9 @@
+import { SessionReminderEmail } from '@/emails/session-reminder'
 import { assertCronAuthorized } from '@/lib/cron/verify-cron-request'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import * as React from 'react'
 
 export const maxDuration = 60
 
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
 
   const resendKey = process.env.RESEND_API_KEY
   const from = process.env.RESEND_FROM_EMAIL
-  const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? ''
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? 'http://localhost:3000'
 
   const windowStart = new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString()
   const windowEnd = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString()
@@ -131,20 +133,21 @@ export async function GET(request: Request) {
   let remindersSent = 0
   const errors: string[] = []
 
-  for (const row of pending) {
-    const lines = [
-      `Hi ${row.name},`,
-      ``,
-      `Reminder: you are booked for ${row.title} at ${row.when}.`,
-      row.loc ? `Location: ${row.loc}` : '',
-      site ? `Dashboard: ${site}/dashboard` : '',
-    ].filter(Boolean)
+  const dashboardUrl = `${site}/dashboard`
 
+  for (const row of pending) {
     const { error: sendErr } = await resend.emails.send({
       from,
       to: row.email,
       subject: `Reminder: ${row.title}`,
-      text: lines.join('\n'),
+      react: React.createElement(SessionReminderEmail, {
+        athleteName: row.name,
+        sessionTitle: row.title,
+        whenLabel: row.when,
+        location: row.loc,
+        dashboardUrl,
+        siteUrl: site,
+      }),
     })
 
     if (sendErr) {

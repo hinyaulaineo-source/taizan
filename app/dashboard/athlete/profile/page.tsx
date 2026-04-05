@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getProfileRowWithOptionalPrimaryCoach } from '@/lib/supabase/profile-row'
 import { isAthleteRole } from '@/lib/auth/roles'
 import AthleteProfileForm from './AthleteProfileForm'
 
@@ -11,13 +12,17 @@ export default async function AthleteProfilePage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, full_name, avatar_url, main_events')
-    .eq('id', user.id)
-    .single()
+  const profile = await getProfileRowWithOptionalPrimaryCoach(supabase, user.id)
 
   if (!isAthleteRole(profile?.role)) redirect('/dashboard/athlete')
+
+  const { data: primaryCoachProfile } = profile?.primary_coach_id
+    ? await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', profile.primary_coach_id)
+        .maybeSingle()
+    : { data: null as { full_name: string | null; email: string } | null }
 
   return (
     <main>
@@ -32,6 +37,14 @@ export default async function AthleteProfilePage() {
         Your name and photo appear in the app header and dashboard. One profile photo at a time
         (URL or upload).
       </p>
+      {primaryCoachProfile ? (
+        <p className="mt-3 text-sm text-zinc-400">
+          <span className="font-medium text-zinc-300">Your coach: </span>
+          {primaryCoachProfile.full_name?.trim()
+            ? primaryCoachProfile.full_name
+            : primaryCoachProfile.email}
+        </p>
+      ) : null}
       <div className="mt-8">
         <AthleteProfileForm
           initialFullName={profile?.full_name ?? null}

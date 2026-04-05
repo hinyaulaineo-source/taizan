@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function SignupPage() {
@@ -13,7 +12,6 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const router = useRouter()
   const supabase = createClient()
 
   async function handleSignup() {
@@ -47,7 +45,7 @@ export default function SignupPage() {
         return
       }
 
-      router.push('/dashboard')
+      window.location.replace('/dashboard')
     } catch {
       setError('Network error. Please try again.')
       setLoading(false)
@@ -172,7 +170,8 @@ export default function SignupPage() {
         {error && <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '16px' }}>{error}</p>}
 
         <button
-          onClick={handleSignup}
+          type="button"
+          onClick={() => void handleSignup()}
           disabled={loading}
           style={{
             width: '100%',

@@ -34,6 +34,15 @@ export default async function CoachDashboard() {
     .order('created_at', { ascending: false })
     .limit(50)
 
+  const { data: assignedAthletes } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .eq('role', 'athlete')
+    .eq('primary_coach_id', user.id)
+    .order('full_name', { ascending: true })
+
+  const assignedIds = new Set((assignedAthletes ?? []).map((a) => a.id))
+
   const coachSessionIds = new Set((sessions ?? []).map((s) => s.id))
   const { data: coachBookings } = coachSessionIds.size > 0
     ? await supabase
@@ -86,6 +95,9 @@ export default async function CoachDashboard() {
 
     return Array.from(map.values())
   })()
+
+  const rosterById = new Map(roster.map((a) => [a.athlete_id, a]))
+  const alsoInteracted = roster.filter((a) => !assignedIds.has(a.athlete_id))
 
   const totalCoachSessions = coachSessionIds.size || 1
 
@@ -257,18 +269,82 @@ export default async function CoachDashboard() {
 
       <section className="mt-10">
         <h2 className="mb-3 text-base font-semibold text-foreground">
-          My roster
-          <span className="ml-2 text-sm font-normal text-zinc-500">({roster.length})</span>
+          My assigned athletes
+          <span className="ml-2 text-sm font-normal text-zinc-500">
+            ({assignedAthletes?.length ?? 0})
+          </span>
         </h2>
-        {roster.length === 0 ? (
+        {(assignedAthletes?.length ?? 0) === 0 ? (
           <Card>
             <CardContent>
-              <p className="text-sm text-muted-foreground">No athletes yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No athletes assigned to you yet. The club owner can assign athletes to you from the owner
+                dashboard.
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
-            {roster.map((a) => {
+            {(assignedAthletes ?? []).map((athlete) => {
+              const a = rosterById.get(athlete.id)
+              const pct = a
+                ? Math.min(100, Math.round((a.bookingCount / totalCoachSessions) * 100))
+                : 0
+              return (
+                <Card key={athlete.id}>
+                  <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        {athlete.full_name ?? 'Unnamed'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{athlete.email}</p>
+                      {a ? (
+                        <div className="mt-2 w-48">
+                          <WorkoutProgressBar value={pct} />
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {a ? (
+                        <>
+                          <WorkoutProgressRing value={pct} />
+                          {a.last_feedback_at ? (
+                            <Badge tone="neutral">
+                              Last: {new Date(a.last_feedback_at).toLocaleDateString('en-GB')}
+                            </Badge>
+                          ) : (
+                            <Badge tone="warning">No feedback yet</Badge>
+                          )}
+                        </>
+                      ) : (
+                        <Badge tone="neutral">No sessions yet</Badge>
+                      )}
+                      <Link
+                        href={`/dashboard/coach/athletes/${athlete.id}`}
+                        className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent"
+                      >
+                        Edit profile
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      {alsoInteracted.length > 0 ? (
+        <section className="mt-10">
+          <h2 className="mb-3 text-base font-semibold text-foreground">
+            Also interacted with
+            <span className="ml-2 text-sm font-normal text-zinc-500">({alsoInteracted.length})</span>
+          </h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Athletes from bookings or feedback who are not in your assigned roster.
+          </p>
+          <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
+            {alsoInteracted.map((a) => {
               const pct = Math.min(100, Math.round((a.bookingCount / totalCoachSessions) * 100))
               return (
                 <Card key={a.athlete_id}>
@@ -283,7 +359,9 @@ export default async function CoachDashboard() {
                     <div className="flex items-center gap-3">
                       <WorkoutProgressRing value={pct} />
                       {a.last_feedback_at ? (
-                        <Badge tone="neutral">Last: {new Date(a.last_feedback_at).toLocaleDateString('en-GB')}</Badge>
+                        <Badge tone="neutral">
+                          Last: {new Date(a.last_feedback_at).toLocaleDateString('en-GB')}
+                        </Badge>
                       ) : (
                         <Badge tone="warning">No feedback yet</Badge>
                       )}
@@ -293,8 +371,8 @@ export default async function CoachDashboard() {
               )
             })}
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
     </main>
   )
 }

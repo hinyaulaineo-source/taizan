@@ -23,6 +23,7 @@ const coachItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/dashboard/coach/new-session', label: 'New Session', icon: CalendarDays },
   { href: '/dashboard/coach/feedback', label: 'Feedback', icon: MessageCircle },
+  { href: '/dashboard/coach/profile', label: 'Profile', icon: User },
 ]
 
 function getItems(role?: string): NavItem[] {

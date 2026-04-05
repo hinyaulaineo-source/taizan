@@ -6,6 +6,7 @@
  * defaults aligned with the DB column sizes.
  */
 
+import { COACH_TIERS } from '@/lib/coach-tier'
 import { z } from 'zod'
 
 // ────────────────────────────────────────────────
@@ -30,6 +31,8 @@ const SESSION_STATUSES_PATCH = ['draft', 'published', 'cancelled'] as const
 const SESSION_TYPES = ['track_session', 'gym_session', 'recovery', 'strength'] as const
 const COACH_ACTIONS = ['approve', 'reject'] as const
 
+export const COACH_TIERS_DB = ['senior_coach', 'coach_assistant', 'junior_coach'] as const
+
 // ────────────────────────────────────────────────
 // Auth
 // ────────────────────────────────────────────────
@@ -49,6 +52,12 @@ export const profilePatchSchema = z.object({
   full_name: safeString(200).optional().nullable(),
   avatar_url: z.string().url().max(2048).optional().nullable(),
   main_events: z.array(safeString(50)).max(12).optional().nullable(),
+}).strict()
+
+/** Owner assigns primary coach to an athlete (coach or owner account); `coachId: null` clears assignment. */
+export const adminAthleteCoachSchema = z.object({
+  athleteId: uuid,
+  coachId: uuid.nullable(),
 }).strict()
 
 // ────────────────────────────────────────────────
@@ -190,6 +199,11 @@ export const accountIdentitySchema = z.object({
 export const coachRequestSchema = z.object({
   profileId: uuid,
   action: z.enum(COACH_ACTIONS),
+}).strict()
+
+export const adminCoachTierSchema = z.object({
+  profileId: uuid,
+  coachTier: z.enum(COACH_TIERS),
 }).strict()
 
 export const subscriptionSchema = z.object({
