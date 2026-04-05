@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       .select('id, role, coach_request_pending')
       .eq('id', profileId)
       .maybeSingle()
-    existing = retry.data
+    existing = retry.data ? { ...retry.data, coach_tier: null } : null
     readErr = retry.error
   }
 
