@@ -25,6 +25,7 @@ end $$;
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text unique not null,
+  phone text,
   full_name text,
   avatar_url text,
   sheet_ref_no text,
@@ -37,6 +38,10 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create unique index if not exists idx_profiles_phone_unique
+  on public.profiles (phone)
+  where phone is not null;
 
 create table if not exists public.subscriptions (
   id uuid primary key default gen_random_uuid(),

@@ -10,6 +10,8 @@ import SheetSyncForm from './SheetSyncForm'
 import CoachApprovalForm from './CoachApprovalForm'
 import AccountManager from './AccountManager'
 import CoachManager from './CoachManager'
+import CreateAccountForm from './CreateAccountForm'
+import ChangePasswordForm from '@/components/dashboard/ChangePasswordForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -254,6 +256,15 @@ export default async function AdminDashboard() {
       </section>
 
       <section className="mt-10">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Create account</h2>
+        <Card>
+          <CardContent className="p-6">
+            <CreateAccountForm />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-10">
         <h2 className="mb-3 text-base font-semibold text-zinc-100">Manage accounts</h2>
         <Card>
           <CardContent className="p-6">
@@ -293,6 +304,17 @@ export default async function AdminDashboard() {
         <Card>
           <CardContent className="p-6">
             <SubscriptionManagerForm athletes={athletes ?? []} subscriptions={subscriptions ?? []} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-base font-semibold text-zinc-100">Account security</h2>
+        <Card>
+          <CardContent className="p-6">
+            <div className="max-w-md">
+              <ChangePasswordForm variant="zinc" />
+            </div>
           </CardContent>
         </Card>
       </section>

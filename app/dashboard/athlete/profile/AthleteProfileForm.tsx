@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 
@@ -29,12 +29,15 @@ const MAIN_EVENT_OPTIONS = [
 export default function AthleteProfileForm({
   initialFullName,
   initialAvatarUrl,
+  initialPhone = null,
   initialMainEvents,
   hideMainEvents = false,
   patchPath,
 }: {
   initialFullName: string | null
   initialAvatarUrl: string | null
+  /** Digits-only storage; shown for editing. Changing it updates sign-in password to match. */
+  initialPhone?: string | null
   initialMainEvents: string[]
   /** Omit main events (e.g. coach self-service profile). */
   hideMainEvents?: boolean
@@ -44,11 +47,18 @@ export default function AthleteProfileForm({
   const router = useRouter()
   const [fullName, setFullName] = useState(initialFullName ?? '')
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl ?? '')
+  const [phone, setPhone] = useState(() =>
+    initialPhone ? initialPhone.replace(/\D/g, '') : '',
+  )
   const [mainEvents, setMainEvents] = useState<string[]>(initialMainEvents ?? [])
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setPhone(initialPhone ? initialPhone.replace(/\D/g, '') : '')
+  }, [initialPhone])
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -59,6 +69,7 @@ export default function AthleteProfileForm({
     const payload: Record<string, unknown> = {
       full_name: fullName.trim() || null,
       avatar_url: avatarUrl.trim() || null,
+      phone: phone.replace(/\D/g, '') || null,
     }
     if (!hideMainEvents) {
       payload.main_events = mainEvents
@@ -184,6 +195,24 @@ export default function AthleteProfileForm({
           onChange={(e) => setFullName(e.target.value)}
           className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
         />
+      </div>
+
+      <div>
+        <label htmlFor="phone" className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Phone (sign-in password)
+        </label>
+        <input
+          id="phone"
+          type="tel"
+          autoComplete="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="Digits only, min 6"
+          className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-zinc-500">
+          Same number you use as password with your email at login. Non-digits are stripped when you save.
+        </p>
       </div>
 
       {!hideMainEvents ? (

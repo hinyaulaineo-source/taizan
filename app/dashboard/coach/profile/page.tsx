@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { isOwnerLike } from '@/lib/auth/roles'
+import ChangePasswordForm from '@/components/dashboard/ChangePasswordForm'
 import AthleteProfileForm from '@/app/dashboard/athlete/profile/AthleteProfileForm'
 
 export default async function CoachProfilePage() {
@@ -13,7 +14,7 @@ export default async function CoachProfilePage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name, avatar_url')
+    .select('role, full_name, avatar_url, phone')
     .eq('id', user.id)
     .single()
 
@@ -32,13 +33,15 @@ export default async function CoachProfilePage() {
       <p className="mt-1 text-sm text-muted-foreground">
         Update how your name and photo appear in the app. Email is managed in Supabase Auth.
       </p>
-      <div className="mt-8">
+      <div className="mt-8 space-y-8">
         <AthleteProfileForm
           initialFullName={profile?.full_name ?? null}
           initialAvatarUrl={profile?.avatar_url ?? null}
+          initialPhone={profile?.phone ?? null}
           initialMainEvents={[]}
           hideMainEvents
         />
+        <ChangePasswordForm variant="card" />
       </div>
     </main>
   )

@@ -6,6 +6,7 @@ export type ProfileRowWithPrimaryCoach = {
   avatar_url: string | null
   main_events: string[] | null
   primary_coach_id: string | null
+  phone: string | null
 }
 
 function coerceProfileRow(data: Record<string, unknown>): ProfileRowWithPrimaryCoach {
@@ -19,6 +20,7 @@ function coerceProfileRow(data: Record<string, unknown>): ProfileRowWithPrimaryC
         ? null
         : [],
     primary_coach_id: (data.primary_coach_id as string | null) ?? null,
+    phone: (data.phone as string | null) ?? null,
   }
 }
 
@@ -36,7 +38,7 @@ export async function getProfileRowWithOptionalPrimaryCoach(
   const attempts: PromiseLike<{ data: Row | null; error: { code?: string } | null }>[] = [
     supabase
       .from('profiles')
-      .select('role, full_name, avatar_url, main_events, primary_coach_id')
+      .select('role, full_name, avatar_url, main_events, primary_coach_id, phone')
       .eq('id', userId)
       .single(),
     supabase.from('profiles').select('role, full_name, avatar_url, main_events').eq('id', userId).single(),

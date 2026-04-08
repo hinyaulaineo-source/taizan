@@ -46,7 +46,12 @@ export default async function DashboardLayout({
       { href: '/dashboard/athlete/weekly', label: 'Weekly Schedule' },
       { href: '/dashboard/athlete/profile', label: 'My profile' },
     ],
-    parent: [{ href: '/dashboard/parent', label: 'Parent Dashboard' }],
+    parent: [
+      { href: '/dashboard/parent', label: 'Parent Dashboard' },
+      { href: '/dashboard/parent/book', label: 'Book sessions' },
+      { href: '/dashboard/parent/weekly', label: 'Weekly Schedule' },
+      { href: '/dashboard/parent/profile', label: 'My profile' },
+    ],
   }
 
   const navItems = itemsByRole[role] ?? itemsByRole.athlete

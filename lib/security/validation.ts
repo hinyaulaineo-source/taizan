@@ -7,6 +7,11 @@
  */
 
 import { COACH_TIERS } from '@/lib/coach-tier'
+import {
+  isValidPhoneDigits,
+  normalizePhoneDigits,
+  phoneDigitsSchemaMessage,
+} from '@/lib/phone-auth'
 import { z } from 'zod'
 
 // ────────────────────────────────────────────────
@@ -31,28 +36,59 @@ const SESSION_STATUSES_PATCH = ['draft', 'published', 'cancelled'] as const
 const SESSION_TYPES = ['track_session', 'gym_session', 'recovery', 'strength'] as const
 const COACH_ACTIONS = ['approve', 'reject'] as const
 
-export const COACH_TIERS_DB = ['senior_coach', 'coach_assistant', 'junior_coach'] as const
-
 // ────────────────────────────────────────────────
 // Auth
 // ────────────────────────────────────────────────
 
-export const signupSchema = z.object({
-  email,
-  password: z.string().min(6).max(128),
-  fullName: safeString(200).optional().nullable(),
-  role: z.enum(VALID_ROLES).default('athlete'),
-}).strict()
+const phoneField = z.string().max(32).trim()
+
+export const signupSchema = z
+  .object({
+    email,
+    phone: phoneField,
+    fullName: safeString(200).optional().nullable(),
+    role: z.enum(VALID_ROLES).default('athlete'),
+  })
+  .strict()
+  .refine((d) => isValidPhoneDigits(normalizePhoneDigits(d.phone)), {
+    message: phoneDigitsSchemaMessage(),
+    path: ['phone'],
+  })
+
+/** Owner-only: create athlete / parent / coach with phone as sign-in password. */
+export const adminAccountCreateSchema = z
+  .object({
+    email,
+    phone: phoneField,
+    fullName: safeString(200).min(1),
+    role: z.enum(VALID_ROLES),
+  })
+  .strict()
+  .refine((d) => isValidPhoneDigits(normalizePhoneDigits(d.phone)), {
+    message: phoneDigitsSchemaMessage(),
+    path: ['phone'],
+  })
 
 // ────────────────────────────────────────────────
 // Profile
 // ────────────────────────────────────────────────
 
-export const profilePatchSchema = z.object({
-  full_name: safeString(200).optional().nullable(),
-  avatar_url: z.string().url().max(2048).optional().nullable(),
-  main_events: z.array(safeString(50)).max(12).optional().nullable(),
-}).strict()
+export const profilePatchSchema = z
+  .object({
+    full_name: safeString(200).optional().nullable(),
+    avatar_url: z.string().url().max(2048).optional().nullable(),
+    main_events: z.array(safeString(50)).max(12).optional().nullable(),
+    phone: phoneField.optional().nullable(),
+  })
+  .strict()
+  .refine(
+    (d) =>
+      d.phone === undefined ||
+      d.phone === null ||
+      d.phone === '' ||
+      isValidPhoneDigits(normalizePhoneDigits(d.phone)),
+    { message: phoneDigitsSchemaMessage(), path: ['phone'] },
+  )
 
 /** Owner assigns primary coach to an athlete (coach or owner account); `coachId: null` clears assignment. */
 export const adminAthleteCoachSchema = z.object({

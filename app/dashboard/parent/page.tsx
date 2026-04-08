@@ -115,7 +115,7 @@ export default async function ParentDashboard() {
         ))}
       </section>
 
-      <section className="mb-10">
+      <section id="parent-calendar" className="mb-10 scroll-mt-24">
         <h2 className="mb-3 text-base font-semibold text-foreground">Calendar</h2>
         {athleteIds.length === 0 && !ownerPreview && (
           <Card>
@@ -228,7 +228,8 @@ export default async function ParentDashboard() {
 
             return Array.from(eventsMap.values())
           })()}
-          bookingLink="/dashboard/parent"
+          bookingLink="/dashboard/parent/book"
+          weeklyLink="/dashboard/parent/weekly"
           initialMonth={new Date()}
         />
       </section>

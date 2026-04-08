@@ -37,11 +37,15 @@ export default async function DashboardPage() {
     const coachRequested = desiredRole === 'coach'
     const fullName =
       (user.user_metadata?.full_name as string | undefined) ?? user.email?.split('@')[0] ?? 'Athlete'
+    const phoneFromMeta = user.user_metadata?.phone
+    const phone =
+      typeof phoneFromMeta === 'string' && phoneFromMeta.length > 0 ? phoneFromMeta.replace(/\D/g, '') : null
 
     const fullPayload = {
       id: user.id,
       email: user.email ?? '',
       full_name: fullName,
+      ...(phone ? { phone } : {}),
       role: (shouldBeParent ? 'parent' : 'athlete') as 'parent' | 'athlete',
       coach_request_pending: coachRequested,
       coach_requested_at: coachRequested ? new Date().toISOString() : null,
@@ -73,6 +77,7 @@ export default async function DashboardPage() {
             id: user.id,
             email: user.email ?? '',
             full_name: fullName,
+            ...(phone ? { phone } : {}),
             role: (shouldBeParent ? 'parent' : 'athlete') as 'parent' | 'athlete',
           },
           { onConflict: 'id' },

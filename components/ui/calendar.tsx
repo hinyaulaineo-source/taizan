@@ -137,16 +137,14 @@ export function Calendar({
             Click a day to see sessions. Colors: indigo = sessions available, green = booked.
           </p>
           <div className="mt-3 flex gap-2">
-            <Link href={bookingLink}>
-              <Button className="bg-white text-zinc-800 hover:bg-zinc-200">Book Now</Button>
-            </Link>
-            {weeklyLink && (
-              <Link href={weeklyLink}>
-                <Button variant="outline" className="text-foreground">
-                  Weekly View
-                </Button>
-              </Link>
-            )}
+            <Button asChild className="bg-white text-zinc-800 hover:bg-zinc-200">
+              <Link href={bookingLink}>Book Now</Link>
+            </Button>
+            {weeklyLink ? (
+              <Button asChild variant="outline" className="text-foreground">
+                <Link href={weeklyLink}>Weekly View</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
 

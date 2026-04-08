@@ -1,4 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
+import { findProfilePhoneClash, syncAuthPasswordToPhoneDigits } from '@/lib/profile-phone'
+import { normalizePhoneDigits } from '@/lib/phone-auth'
+import { createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
 import { NextResponse } from 'next/server'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { parseBody, profilePatchSchema } from '@/lib/security/validation'
@@ -22,6 +25,7 @@ export async function PATCH(request: Request) {
 
   const body = parsed.data
   const updates: Record<string, string | string[] | null> = {}
+  let phoneNorm: string | null = null
 
   if ('full_name' in body) {
     const v = body.full_name
@@ -47,19 +51,50 @@ export async function PATCH(request: Request) {
     }
   }
 
+  if ('phone' in body && body.phone !== undefined && body.phone !== null) {
+    const norm = normalizePhoneDigits(body.phone)
+    updates.phone = norm
+    phoneNorm = norm
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 })
+  }
+
+  if (phoneNorm) {
+    const admin = createAdminClientOrNull()
+    if (!admin) {
+      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 })
+    }
+    const clash = await findProfilePhoneClash(admin, phoneNorm, user.id)
+    if (clash) {
+      return NextResponse.json({ error: clash }, { status: 409 })
+    }
   }
 
   const { data, error } = await supabase
     .from('profiles')
     .update(updates)
     .eq('id', user.id)
-    .select('id, full_name, avatar_url, main_events, email')
+    .select('id, full_name, avatar_url, main_events, email, phone')
     .single()
 
   if (error) {
     return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
+  }
+
+  if (phoneNorm) {
+    const admin = createAdminClientOrNull()
+    if (!admin) {
+      return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 })
+    }
+    const { error: pwErr } = await syncAuthPasswordToPhoneDigits(admin, user.id, phoneNorm)
+    if (pwErr) {
+      return NextResponse.json(
+        { error: `Profile saved but sign-in password could not be updated: ${pwErr}` },
+        { status: 500 },
+      )
+    }
   }
 
   return NextResponse.json(data)

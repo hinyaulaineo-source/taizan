@@ -7,7 +7,7 @@ import Link from 'next/link'
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
-  const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [role, setRole] = useState<'athlete' | 'parent' | 'coach'>('athlete')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,7 +22,7 @@ export default function SignupPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, fullName, role }),
+        body: JSON.stringify({ email, phone, fullName, role }),
       })
 
       const data = (await res.json().catch(() => null)) as { error?: string } | null
@@ -36,7 +36,7 @@ export default function SignupPage() {
       // Account created and auto-confirmed — sign in immediately
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password: phone.replace(/\D/g, ''),
       })
 
       if (signInErr) {
@@ -146,13 +146,14 @@ export default function SignupPage() {
 
         <div style={{ marginBottom: '20px' }}>
           <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '6px' }}>
-            Password
+            Phone number (used as your password when you sign in)
           </label>
           <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="********"
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+852 … or digits only (min 6)"
             onKeyDown={(e) => e.key === 'Enter' && handleSignup()}
             style={{
               width: '100%',
@@ -165,6 +166,9 @@ export default function SignupPage() {
               outline: 'none',
             }}
           />
+          <p style={{ color: '#555', fontSize: '11px', marginTop: '6px', lineHeight: 1.4 }}>
+            Sign in later with your email and the same phone number (spaces and symbols are ignored).
+          </p>
         </div>
 
         {error && <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '16px' }}>{error}</p>}

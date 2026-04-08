@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getProfileRowWithOptionalPrimaryCoach } from '@/lib/supabase/profile-row'
 import { isAthleteRole } from '@/lib/auth/roles'
+import ChangePasswordForm from '@/components/dashboard/ChangePasswordForm'
 import AthleteProfileForm from './AthleteProfileForm'
 
 export default async function AthleteProfilePage() {
@@ -45,12 +46,14 @@ export default async function AthleteProfilePage() {
             : primaryCoachProfile.email}
         </p>
       ) : null}
-      <div className="mt-8">
+      <div className="mt-8 space-y-10">
         <AthleteProfileForm
           initialFullName={profile?.full_name ?? null}
           initialAvatarUrl={profile?.avatar_url ?? null}
+          initialPhone={profile?.phone ?? null}
           initialMainEvents={(profile?.main_events as string[] | null) ?? []}
         />
+        <ChangePasswordForm variant="zinc" />
       </div>
     </main>
   )

@@ -17,6 +17,7 @@ const athleteItems: NavItem[] = [
 const parentItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/dashboard/parent', label: 'Athletes', icon: Users },
+  { href: '/dashboard/parent/profile', label: 'Profile', icon: User },
 ]
 
 const coachItems: NavItem[] = [

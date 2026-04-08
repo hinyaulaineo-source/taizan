@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { normalizePhoneDigits } from '@/lib/phone-auth'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -18,27 +19,32 @@ export default function LoginPage() {
 
   async function handleLogin() {
     const trimmedEmail = email.trim()
-    if (!trimmedEmail || !password) {
+    if (!trimmedEmail || !password.trim()) {
       setError('Enter your email and password.')
       return
     }
     setLoading(true)
     setError('')
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
-        password,
-      })
-      if (signInError) {
-        setError(signInError.message)
-        setLoading(false)
-        return
+      const trimmedPw = password.trim()
+      const digitPw = normalizePhoneDigits(trimmedPw)
+      const candidates = [...new Set([trimmedPw, digitPw].filter(Boolean))]
+      let lastErr: { message: string } | null = null
+      for (const pw of candidates) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: pw,
+        })
+        if (!signInError) {
+          window.location.replace('/dashboard')
+          return
+        }
+        lastErr = signInError
       }
-      // Hard navigation: sends cookies set by the browser Supabase client on the next request.
-      // Do not use router.refresh() here — it can hang and block navigation.
-      window.location.replace('/dashboard')
+      setError(lastErr?.message ?? 'Sign-in failed.')
     } catch {
       setError('Something went wrong. Check your connection and try again.')
+    } finally {
       setLoading(false)
     }
   }
@@ -101,11 +107,15 @@ export default function LoginPage() {
 
         <div style={{ marginBottom: '20px' }}>
           <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Password</label>
+          <p style={{ color: '#555', fontSize: '11px', marginBottom: '6px', lineHeight: 1.4 }}>
+            For most accounts this is your registered phone number (digits). If you used &quot;Forgot password&quot;
+            to set a custom password, enter that instead.
+          </p>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="********"
+            placeholder="Phone digits or your password"
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
             style={{
               width: '100%',

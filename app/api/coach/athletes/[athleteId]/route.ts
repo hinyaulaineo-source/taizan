@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { normalizeRole } from '@/lib/auth/roles'
+import { normalizePhoneDigits } from '@/lib/phone-auth'
+import { findProfilePhoneClash, syncAuthPasswordToPhoneDigits } from '@/lib/profile-phone'
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
@@ -40,6 +42,7 @@ export async function PATCH(
 
   const body = parsed.data
   const updates: Record<string, string | string[] | null> = {}
+  let phoneNorm: string | null = null
 
   if ('full_name' in body) {
     const v = body.full_name
@@ -65,6 +68,12 @@ export async function PATCH(
     }
   }
 
+  if ('phone' in body && body.phone !== undefined && body.phone !== null) {
+    const norm = normalizePhoneDigits(body.phone)
+    updates.phone = norm
+    phoneNorm = norm
+  }
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 })
   }
@@ -78,6 +87,13 @@ export async function PATCH(
   const admin = createSupabaseClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+
+  if (phoneNorm) {
+    const clash = await findProfilePhoneClash(admin, phoneNorm, athleteId)
+    if (clash) {
+      return NextResponse.json({ error: clash }, { status: 409 })
+    }
+  }
 
   const { data: athlete, error: readErr } = await admin
     .from('profiles')
@@ -102,11 +118,21 @@ export async function PATCH(
     .from('profiles')
     .update(updates)
     .eq('id', athleteId)
-    .select('id, full_name, avatar_url, main_events, email')
+    .select('id, full_name, avatar_url, main_events, email, phone')
     .single()
 
   if (error) {
     return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
+  }
+
+  if (phoneNorm) {
+    const { error: pwErr } = await syncAuthPasswordToPhoneDigits(admin, athleteId, phoneNorm)
+    if (pwErr) {
+      return NextResponse.json(
+        { error: `Profile saved but athlete sign-in password could not be updated: ${pwErr}` },
+        { status: 500 },
+      )
+    }
   }
 
   return NextResponse.json(data)

@@ -28,7 +28,7 @@ export default async function CoachEditAthletePage({
 
   const { data: athlete } = await supabase
     .from('profiles')
-    .select('id, role, full_name, avatar_url, main_events, primary_coach_id, email')
+    .select('id, role, full_name, avatar_url, main_events, primary_coach_id, email, phone')
     .eq('id', athleteId)
     .maybeSingle()
 
@@ -55,6 +55,7 @@ export default async function CoachEditAthletePage({
         <AthleteProfileForm
           initialFullName={athlete.full_name ?? null}
           initialAvatarUrl={athlete.avatar_url ?? null}
+          initialPhone={athlete.phone ?? null}
           initialMainEvents={(athlete.main_events as string[] | null) ?? []}
           patchPath={`/api/coach/athletes/${athleteId}`}
         />
