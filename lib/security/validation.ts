@@ -107,6 +107,33 @@ export const personalBestSchema = z.object({
   recordedAt: z.string().datetime({ offset: true }).or(z.string().date()).optional(),
 }).strict()
 
+export const trainingLogSchema = z
+  .object({
+    distanceKm: z.number().positive().max(1000),
+    durationSeconds: z.number().positive().max(86400),
+    runningPercent: z.number().min(0).max(100),
+    loggedAt: z.string().datetime({ offset: true }).or(z.string().date()).optional(),
+    note: safeString(500).optional(),
+  })
+  .strict()
+
+export const trainingLogPatchSchema = z
+  .object({
+    id: uuid,
+    distanceKm: z.number().positive().max(1000),
+    durationSeconds: z.number().positive().max(86400),
+    runningPercent: z.number().min(0).max(100),
+    loggedAt: z.string().datetime({ offset: true }).or(z.string().date()).optional(),
+    note: safeString(500).optional(),
+  })
+  .strict()
+
+export const trainingLogDeleteSchema = z
+  .object({
+    id: uuid,
+  })
+  .strict()
+
 // ────────────────────────────────────────────────
 // Sessions
 // ────────────────────────────────────────────────

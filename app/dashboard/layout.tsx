@@ -43,6 +43,7 @@ export default async function DashboardLayout({
     ],
     athlete: [
       { href: '/dashboard/athlete', label: 'Athlete Dashboard' },
+      { href: '/dashboard/athlete/training', label: 'Training log' },
       { href: '/dashboard/athlete/weekly', label: 'Weekly Schedule' },
       { href: '/dashboard/athlete/profile', label: 'My profile' },
     ],

@@ -292,6 +292,31 @@ export default async function AthleteDashboard() {
         </Card>
       </section>
 
+      <section className="mt-10">
+        <Card>
+          <CardContent>
+            <Link
+              href="/dashboard/athlete/training"
+              className="group block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <h2 className="mb-1 text-sm font-semibold text-foreground group-hover:underline">
+                Training progression
+              </h2>
+            </Link>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Open your full training log to see charts and every session you’ve entered—distance, time, running %,
+              and notes.
+            </p>
+            <Link
+              href="/dashboard/athlete/training"
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              View all sessions →
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="mt-8">
         <div className="glass-panel min-h-[220px] p-5">
           {(() => {
