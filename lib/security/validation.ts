@@ -259,6 +259,12 @@ export const accountIdentitySchema = z.object({
   role: z.enum(VALID_ROLES),
 }).strict()
 
+/** Owner-only: change a member's display name. */
+export const adminAccountNameSchema = z.object({
+  profileId: uuid,
+  fullName: safeString(200).min(1),
+}).strict()
+
 export const coachRequestSchema = z.object({
   profileId: uuid,
   action: z.enum(COACH_ACTIONS),

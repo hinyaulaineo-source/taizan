@@ -34,6 +34,7 @@ export default function AccountManager({
 }) {
   const router = useRouter()
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [savingNameId, setSavingNameId] = useState<string | null>(null)
   const [savingCoachForId, setSavingCoachForId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
@@ -66,6 +67,53 @@ export default function AccountManager({
   }, [profiles])
 
   const [roleDraft, setRoleDraft] = useState<Map<string, string>>(initialById)
+
+  const initialNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    profiles.forEach((p) => map.set(p.id, p.full_name ?? ''))
+    return map
+  }, [profiles])
+
+  const [nameDraft, setNameDraft] = useState<Map<string, string>>(initialNameById)
+  const [committedNames, setCommittedNames] = useState<Map<string, string>>(initialNameById)
+
+  async function updateName(profileId: string, nextName: string) {
+    const fullName = nextName.trim()
+    if (!fullName) {
+      setError('Enter a name.')
+      return
+    }
+    setSavingNameId(profileId)
+    setError('')
+    try {
+      const res = await fetch('/api/admin/account-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, fullName }),
+      })
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) {
+        setError(data?.error ? data.error : `Failed to update name (HTTP ${res.status}).`)
+        setSavingNameId(null)
+        return
+      }
+      setNameDraft((prev) => {
+        const n = new Map(prev)
+        n.set(profileId, fullName)
+        return n
+      })
+      setCommittedNames((prev) => {
+        const n = new Map(prev)
+        n.set(profileId, fullName)
+        return n
+      })
+      router.refresh()
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setSavingNameId(null)
+    }
+  }
 
   async function updateRole(profileId: string, nextRole: string) {
     setSavingId(profileId)
@@ -144,19 +192,57 @@ export default function AccountManager({
 
   return (
     <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Change a member&apos;s display name, then save. Role and primary coach stay on the same row.
+      </p>
       {sortedProfiles.length === 0 ? (
         <p className="text-sm text-muted-foreground">No accounts found.</p>
       ) : (
         <div className="max-h-[480px] space-y-2 overflow-y-auto pr-1">
           {sortedProfiles.map((p) => {
             const draftRole = roleDraft.get(p.id) ?? p.role
+            const draftName = nameDraft.get(p.id) ?? p.full_name ?? ''
+            const savedName = committedNames.get(p.id) ?? p.full_name ?? ''
+            const nameDirty = draftName.trim() !== savedName.trim()
             const sub = subByUserId.get(p.id)
             const showCoachAssign = draftRole === 'athlete'
             return (
               <div key={p.id} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-foreground">{p.full_name ?? 'Unnamed'}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="sr-only" htmlFor={`account-name-${p.id}`}>
+                      Full name
+                    </label>
+                    <input
+                      id={`account-name-${p.id}`}
+                      value={draftName}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setNameDraft((prev) => {
+                          const n = new Map(prev)
+                          n.set(p.id, value)
+                          return n
+                        })
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && nameDirty) {
+                          e.preventDefault()
+                          void updateName(p.id, draftName)
+                        }
+                      }}
+                      placeholder="Unnamed"
+                      className="h-9 min-w-[10rem] flex-1 rounded-md border border-border bg-background px-3 text-sm font-semibold text-foreground"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => void updateName(p.id, draftName)}
+                      disabled={savingNameId === p.id || !nameDirty || !draftName.trim()}
+                      variant="outline"
+                      size="sm"
+                      className="hover:bg-zinc-200"
+                    >
+                      {savingNameId === p.id ? 'Saving…' : 'Save name'}
+                    </Button>
                     {sub && (
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
                         sub.status === 'active'

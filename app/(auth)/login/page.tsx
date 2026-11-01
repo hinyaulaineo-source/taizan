@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { formatSignInError } from '@/lib/auth/sign-in-error'
 import { normalizePhoneDigits } from '@/lib/phone-auth'
 import { createClient } from '@/lib/supabase/client'
 
@@ -41,9 +42,17 @@ export default function LoginPage() {
         }
         lastErr = signInError
       }
-      setError(lastErr?.message ?? 'Sign-in failed.')
-    } catch {
-      setError('Something went wrong. Check your connection and try again.')
+      const rawMessage = lastErr?.message
+      if (process.env.NODE_ENV === 'development' && rawMessage) {
+        console.error('Sign-in error:', rawMessage)
+      }
+      setError(formatSignInError(rawMessage))
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Sign-in exception:', err)
+      }
+      const message = err instanceof Error ? err.message : undefined
+      setError(formatSignInError(message ?? 'Something went wrong. Check your connection and try again.'))
     } finally {
       setLoading(false)
     }

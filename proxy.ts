@@ -40,17 +40,14 @@ export async function proxy(request: NextRequest) {
   const isLogin = pathname === '/login'
   const isSignup = pathname === '/signup'
 
-  // Unauthenticated users trying to access protected routes → login
   if (!user && isDashboard) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Authenticated users on login/signup → dashboard
   if (user && (isLogin || isSignup)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Role-based route protection for dashboard sub-paths
   if (user && isDashboard) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -71,6 +68,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Include `/dashboard` explicitly — some matcher versions treat `/dashboard/:path*` as subpaths only.
   matcher: ['/dashboard', '/dashboard/:path*', '/login', '/signup'],
 }

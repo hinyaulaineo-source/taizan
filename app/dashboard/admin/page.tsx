@@ -266,6 +266,9 @@ export default async function AdminDashboard() {
 
       <section className="mt-10">
         <h2 className="mb-3 text-base font-semibold text-zinc-100">Manage accounts</h2>
+        <p className="mb-3 text-sm text-zinc-500">
+          Rename members, change roles, assign a primary coach, or delete accounts.
+        </p>
         <Card>
           <CardContent className="p-6">
             <AccountManager
