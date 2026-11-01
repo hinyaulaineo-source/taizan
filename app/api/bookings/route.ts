@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { bookingSchema, parseBody } from '@/lib/security/validation'
+import { adminEnvMissingResponse, createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
+import { consumeSessionQuota, refundSessionQuota } from '@/lib/session-quota'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -66,7 +68,11 @@ export async function POST(request: Request) {
     .eq('session_id', session.id)
     .maybeSingle()
 
-  if (session.max_athletes && !existingBooking) {
+  if (existingBooking?.status === 'booked') {
+    return NextResponse.json({ ok: true })
+  }
+
+  if (session.max_athletes && existingBooking?.status !== 'booked') {
     const { count } = await supabase
       .from('bookings')
       .select('*', { count: 'exact', head: true })
@@ -75,6 +81,17 @@ export async function POST(request: Request) {
     if ((count ?? 0) >= session.max_athletes) {
       return NextResponse.json({ error: 'Session is full.' }, { status: 409 })
     }
+  }
+
+  const admin = createAdminClientOrNull()
+  if (!admin) return adminEnvMissingResponse()
+
+  const consumed = await consumeSessionQuota(admin, user.id, 1)
+  if (!consumed.ok) {
+    return NextResponse.json(
+      { error: consumed.error ?? 'No monthly sessions remaining.', remaining: consumed.remaining },
+      { status: 403 },
+    )
   }
 
   const { error } = await supabase.from('bookings').upsert(
@@ -86,7 +103,10 @@ export async function POST(request: Request) {
     { onConflict: 'athlete_id,session_id' },
   )
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    await refundSessionQuota(admin, user.id, 1)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, remaining: consumed.remaining })
 }

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { bulkBookingSchema, parseBody } from '@/lib/security/validation'
+import { adminEnvMissingResponse, createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
+import { consumeSessionQuota, refundSessionQuota } from '@/lib/session-quota'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -85,27 +87,53 @@ export async function POST(request: Request) {
   )
 
   const eligible = tierEligible.filter((s) => {
-    if (alreadyBookedIds.has(s.id)) return true
+    if (alreadyBookedIds.has(s.id)) return false
     if (!s.max_athletes) return true
     const booked = bookedCountBySession.get(s.id) ?? 0
     return booked < s.max_athletes
   })
 
-  const rows = eligible.map((s) => ({
-    athlete_id: user.id,
-    session_id: s.id,
-    status: 'booked',
-  }))
+  const admin = createAdminClientOrNull()
+  if (!admin) return adminEnvMissingResponse()
 
-  const { error } = await supabase.from('bookings').upsert(rows, {
+  const bookedRows: { athlete_id: string; session_id: string; status: string }[] = []
+  let skippedQuota = 0
+  for (const s of eligible) {
+    const consumed = await consumeSessionQuota(admin, user.id, 1)
+    if (!consumed.ok) {
+      skippedQuota += eligible.length - bookedRows.length
+      break
+    }
+    bookedRows.push({
+      athlete_id: user.id,
+      session_id: s.id,
+      status: 'booked',
+    })
+  }
+
+  if (bookedRows.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      requested: normalizedIds.length,
+      booked: alreadyBookedIds.size,
+      skipped: normalizedIds.length - alreadyBookedIds.size,
+      skippedQuota,
+    })
+  }
+
+  const { error } = await supabase.from('bookings').upsert(bookedRows, {
     onConflict: 'athlete_id,session_id',
   })
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    await refundSessionQuota(admin, user.id, bookedRows.length)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   return NextResponse.json({
     ok: true,
     requested: normalizedIds.length,
-    booked: eligible.length,
-    skipped: normalizedIds.length - eligible.length,
+    booked: alreadyBookedIds.size + bookedRows.length,
+    skipped: normalizedIds.length - alreadyBookedIds.size - bookedRows.length,
+    skippedQuota,
   })
 }

@@ -2,6 +2,14 @@ import { createClient } from '@/lib/supabase/server'
 import { isOwnerLike } from '@/lib/auth/roles'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { coachBookingSchema, coachUnbookSchema, parseBody } from '@/lib/security/validation'
+import { adminEnvMissingResponse, createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
+import {
+  consumeSessionQuota,
+  effectiveQuota,
+  isBookedInCurrentQuotaMonth,
+  isQuotaColumnError,
+  refundSessionQuota,
+} from '@/lib/session-quota'
 import { NextResponse } from 'next/server'
 
 async function requireCoach(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -75,8 +83,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No eligible athletes found.' }, { status: 400 })
   }
 
+  const admin = createAdminClientOrNull()
+  if (!admin) return adminEnvMissingResponse()
+
   let totalBooked = 0
   let totalSkipped = 0
+  let skippedQuota = 0
 
   for (const sess of sessions) {
     const { data: existing } = await supabase
@@ -93,9 +105,20 @@ export async function POST(request: Request) {
       const slotsLeft = Math.max(0, sess.max_athletes - alreadyBookedSet.size)
       toBook = newAthletes.slice(0, slotsLeft)
     }
+    totalSkipped += newAthletes.length - toBook.length
 
-    if (toBook.length > 0) {
-      const rows = toBook.map((athleteId) => ({
+    const confirmed: string[] = []
+    for (const athleteId of toBook) {
+      const consumed = await consumeSessionQuota(admin, athleteId, 1)
+      if (!consumed.ok) {
+        skippedQuota += 1
+        continue
+      }
+      confirmed.push(athleteId)
+    }
+
+    if (confirmed.length > 0) {
+      const rows = confirmed.map((athleteId) => ({
         athlete_id: athleteId,
         session_id: sess.id,
         status: 'booked',
@@ -103,10 +126,14 @@ export async function POST(request: Request) {
       const { error } = await supabase.from('bookings').upsert(rows, {
         onConflict: 'athlete_id,session_id',
       })
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      totalBooked += toBook.length
+      if (error) {
+        for (const athleteId of confirmed) {
+          await refundSessionQuota(admin, athleteId, 1)
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+      totalBooked += confirmed.length
     }
-    totalSkipped += newAthletes.length - toBook.length
   }
 
   return NextResponse.json({
@@ -114,6 +141,7 @@ export async function POST(request: Request) {
     booked: totalBooked,
     sessions: sessions.length,
     skippedFull: totalSkipped,
+    skippedQuota,
     total: targetAthleteIds.length,
   })
 }
@@ -145,6 +173,13 @@ export async function DELETE(request: Request) {
 
   const resolvedIds = batchIds && batchIds.length > 0 ? batchIds : [sessionId!]
 
+  const { data: existing } = await supabase
+    .from('bookings')
+    .select('athlete_id, booked_at, status')
+    .in('session_id', resolvedIds)
+    .in('athlete_id', athleteIds)
+    .eq('status', 'booked')
+
   const { error } = await supabase
     .from('bookings')
     .delete()
@@ -152,6 +187,18 @@ export async function DELETE(request: Request) {
     .in('athlete_id', athleteIds)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const refunds = new Map<string, number>()
+  for (const row of existing ?? []) {
+    if (!isBookedInCurrentQuotaMonth(row.booked_at)) continue
+    refunds.set(row.athlete_id, (refunds.get(row.athlete_id) ?? 0) + 1)
+  }
+  const admin = createAdminClientOrNull()
+  if (admin) {
+    for (const [athleteId, count] of refunds) {
+      await refundSessionQuota(admin, athleteId, count)
+    }
+  }
 
   return NextResponse.json({ ok: true, removed: athleteIds.length, sessions: resolvedIds.length })
 }
@@ -198,7 +245,7 @@ export async function GET(request: Request) {
   const [subsResult, bookingsResult] = await Promise.all([
     supabase
       .from('subscriptions')
-      .select('user_id, tier, profiles!inner(id, full_name, email, role)')
+      .select('user_id, tier, monthly_session_allowance, sessions_remaining, quota_month, profiles!inner(id, full_name, email, role)')
       .eq('status', 'active')
       .eq('profiles.role', 'athlete')
       .in('tier', allowedTiers),
@@ -209,7 +256,19 @@ export async function GET(request: Request) {
       .eq('status', 'booked'),
   ])
 
-  if (subsResult.error) return NextResponse.json({ error: subsResult.error.message }, { status: 500 })
+  let subsData = subsResult.data
+  let subsError = subsResult.error
+  if (subsError && isQuotaColumnError(subsError)) {
+    const retry = await supabase
+      .from('subscriptions')
+      .select('user_id, tier, profiles!inner(id, full_name, email, role)')
+      .eq('status', 'active')
+      .eq('profiles.role', 'athlete')
+      .in('tier', allowedTiers)
+    subsData = retry.data as typeof subsResult.data
+    subsError = retry.error
+  }
+  if (subsError) return NextResponse.json({ error: subsError.message }, { status: 500 })
   if (bookingsResult.error) return NextResponse.json({ error: bookingsResult.error.message }, { status: 500 })
 
   const bookingCounts = new Map<string, number>()
@@ -217,9 +276,10 @@ export async function GET(request: Request) {
     bookingCounts.set(b.athlete_id, (bookingCounts.get(b.athlete_id) ?? 0) + 1),
   )
 
-  const athletes = (subsResult.data ?? []).map((s) => {
+  const athletes = (subsData ?? []).map((s) => {
     const p = s.profiles as unknown as { id: string; full_name: string | null; email: string; role: string }
     const count = bookingCounts.get(p.id) ?? 0
+    const quota = effectiveQuota(s)
     return {
       id: p.id,
       fullName: p.full_name ?? p.email,
@@ -228,6 +288,8 @@ export async function GET(request: Request) {
       bookedCount: count,
       booked: count === totalSessions,
       partial: count > 0 && count < totalSessions,
+      sessionsRemaining: quota.remaining,
+      monthlyAllowance: quota.allowance,
     }
   })
 

@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import { normalizeRole } from '@/lib/auth/roles'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { parentCancelSchema, parseBody } from '@/lib/security/validation'
+import { createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
+import { isBookedInCurrentQuotaMonth, refundSessionQuota } from '@/lib/session-quota'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -38,6 +40,13 @@ export async function POST(request: Request) {
   }
   const { athleteId, sessionId } = parsed.data
 
+  const { data: existing } = await supabase
+    .from('bookings')
+    .select('status, booked_at')
+    .eq('athlete_id', athleteId)
+    .eq('session_id', sessionId)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('bookings')
     .update({ status: 'cancelled' })
@@ -45,6 +54,13 @@ export async function POST(request: Request) {
     .eq('session_id', sessionId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (existing?.status === 'booked' && isBookedInCurrentQuotaMonth(existing.booked_at)) {
+    const admin = createAdminClientOrNull()
+    if (admin) {
+      await refundSessionQuota(admin, athleteId, 1)
+    }
+  }
 
   return NextResponse.json({ ok: true })
 }

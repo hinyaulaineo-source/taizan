@@ -275,11 +275,39 @@ export const adminCoachTierSchema = z.object({
   coachTier: z.enum(COACH_TIERS),
 }).strict()
 
+const monthlySessions = z.number().int().min(0).max(62)
+
 export const subscriptionSchema = z.object({
   athleteId: uuid,
   tier: z.enum(SUBSCRIPTION_TIERS),
   status: z.enum(SUBSCRIPTION_STATUSES),
+  monthlySessionAllowance: monthlySessions.optional(),
+  sessionsRemaining: monthlySessions.optional(),
+  renew: z.boolean().optional(),
 }).strict()
+
+/** Owner or coach: set monthly session allowance / remaining, or renew this month. */
+export const sessionQuotaSchema = z
+  .object({
+    athleteId: uuid.optional(),
+    monthlySessionAllowance: monthlySessions.optional(),
+    sessionsRemaining: monthlySessions.optional(),
+    renew: z.boolean().optional(),
+    renewAll: z.boolean().optional(),
+  })
+  .strict()
+  .refine(
+    (d) =>
+      d.monthlySessionAllowance !== undefined ||
+      d.sessionsRemaining !== undefined ||
+      d.renew === true ||
+      d.renewAll === true,
+    { message: 'Provide monthlySessionAllowance, sessionsRemaining, renew, or renewAll' },
+  )
+  .refine((d) => d.renewAll === true || !!d.athleteId, {
+    message: 'athleteId is required unless renewAll is true',
+    path: ['athleteId'],
+  })
 
 export const parentLinkSchema = z.object({
   parentId: uuid,

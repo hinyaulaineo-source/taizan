@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { isAthleteRole } from '@/lib/auth/roles'
 import BulkBookingForm from './BulkBookingForm'
+import { effectiveQuota } from '@/lib/session-quota'
 
 export default async function AthleteBulkBookPage() {
   const supabase = await createClient()
@@ -20,7 +21,7 @@ export default async function AthleteBulkBookPage() {
 
   const { data: subscription } = await supabase
     .from('subscriptions')
-    .select('tier, status')
+    .select('tier, status, monthly_session_allowance, sessions_remaining, quota_month')
     .eq('user_id', user.id)
     .single()
 
@@ -70,6 +71,9 @@ export default async function AthleteBulkBookPage() {
       <h1 className="mt-3 text-2xl font-semibold text-white">Master booking calendar</h1>
       <p className="mt-1 text-sm text-zinc-500">
         Pick multiple sessions, then book them in one action.
+        {subscription.status === 'active'
+          ? ` ${effectiveQuota(subscription).remaining} of ${effectiveQuota(subscription).allowance} sessions left this month.`
+          : ''}
       </p>
       <div className="mt-6">
         <BulkBookingForm sessions={sessions} />

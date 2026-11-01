@@ -9,6 +9,7 @@ import { Calendar, type CalendarEvent } from '@/components/ui/calendar'
 import { EmptyWorkoutState } from '@/components/ui/empty-workout-state'
 import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
 import PersonalBestForm from './PersonalBestForm'
+import { effectiveQuota } from '@/lib/session-quota'
 
 export default async function AthleteDashboard() {
   const supabase = await createClient()
@@ -38,7 +39,7 @@ export default async function AthleteDashboard() {
 
   const { data: subscription } = await supabase
     .from('subscriptions')
-    .select('tier, status')
+    .select('tier, status, monthly_session_allowance, sessions_remaining, quota_month')
     .eq('user_id', user.id)
     .single()
 
@@ -201,6 +202,12 @@ export default async function AthleteDashboard() {
                 {primaryCoachProfile.full_name?.trim()
                   ? primaryCoachProfile.full_name
                   : primaryCoachProfile.email}
+              </p>
+            ) : null}
+            {!ownerPreview && subscription?.status === 'active' ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {effectiveQuota(subscription).remaining} of {effectiveQuota(subscription).allowance}{' '}
+                sessions left this month
               </p>
             ) : null}
           </div>

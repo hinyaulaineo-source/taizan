@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { isAthleteRole, isOwnerLike } from '@/lib/auth/roles'
 import BookingButton from './BookingButton'
+import { effectiveQuota } from '@/lib/session-quota'
 
 interface PageProps {
   params: Promise<{ sessionId: string }>
@@ -27,7 +28,7 @@ export default async function BookSessionPage({ params }: PageProps) {
 
   const { data: subscription } = await supabase
     .from('subscriptions')
-    .select('tier, status')
+    .select('tier, status, monthly_session_allowance, sessions_remaining, quota_month')
     .eq('user_id', user.id)
     .single()
 
@@ -82,6 +83,12 @@ export default async function BookSessionPage({ params }: PageProps) {
         <p style={{ fontSize: '14px', color: active ? '#4ade80' : '#f87171' }}>
           {subscription ? `${subscription.tier} (${subscription.status})` : 'No subscription found'}
         </p>
+        {active && subscription ? (
+          <p style={{ fontSize: '13px', color: '#888', marginTop: '6px' }}>
+            {effectiveQuota(subscription).remaining} of {effectiveQuota(subscription).allowance} sessions
+            left this month
+          </p>
+        ) : null}
       </div>
 
       {!allowed && (
@@ -89,10 +96,15 @@ export default async function BookSessionPage({ params }: PageProps) {
           You cannot book this session. Make sure your subscription is active and tier-eligible.
         </p>
       )}
+      {allowed && !alreadyBooked && effectiveQuota(subscription).remaining <= 0 && (
+        <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '1rem' }}>
+          You have no monthly sessions left. Ask your coach or club owner if you need more this month.
+        </p>
+      )}
 
       <BookingButton
         sessionId={session.id}
-        disabled={!allowed || alreadyBooked}
+        disabled={!allowed || alreadyBooked || (active && effectiveQuota(subscription).remaining <= 0)}
         alreadyBooked={alreadyBooked}
         previewOnly={previewOnly}
       />

@@ -10,6 +10,8 @@ type Athlete = {
   bookedCount: number
   booked: boolean
   partial: boolean
+  sessionsRemaining?: number
+  monthlyAllowance?: number
 }
 
 export default function SessionAthleteBooker({
@@ -248,6 +250,11 @@ export default function SessionAthleteBooker({
                   </p>
                   <p style={{ fontSize: '11px', color: '#888', margin: 0 }}>
                     {a.email} · {a.tier}
+                    {typeof a.sessionsRemaining === 'number' && typeof a.monthlyAllowance === 'number' ? (
+                      <span>
+                        {' '}· {a.sessionsRemaining}/{a.monthlyAllowance} left
+                      </span>
+                    ) : null}
                     {isBatch && a.bookedCount > 0 && (
                       <span style={{ color: a.booked ? '#4ade80' : '#f59e0b' }}>
                         {' '}· {a.bookedCount}/{totalSessions}
@@ -336,7 +343,7 @@ export default function SessionAthleteBooker({
                     <button
                       type="button"
                       onClick={() => bookSingle(a.id)}
-                      disabled={actionIds.has(a.id)}
+                      disabled={actionIds.has(a.id) || (a.sessionsRemaining ?? 1) <= 0}
                       style={{
                         ...btnBase,
                         padding: '4px 12px',

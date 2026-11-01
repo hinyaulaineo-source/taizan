@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { isOwnerLike } from '@/lib/auth/roles'
 import { isCoachTierColumnError } from '@/lib/supabase/admin-helpers'
+import { isQuotaColumnError } from '@/lib/session-quota'
 import { redirect } from 'next/navigation'
 import ApprovalButtons from './sessions/ApprovalButtons'
 import { Card, CardContent } from '@/components/ui/card'
@@ -82,14 +83,30 @@ export default async function AdminDashboard() {
     ...(accounts ?? []).filter((a) => a.role === 'athlete').map((a) => a.id),
   ]
   const uniqueIds = [...new Set(allProfileIds)]
-  const { data: subscriptions } = uniqueIds.length > 0
-    ? await supabase
+  type SubRow = {
+    user_id: string
+    tier: string
+    status: string
+    monthly_session_allowance?: number | null
+    sessions_remaining?: number | null
+    quota_month?: string | null
+  }
+  let subscriptions: SubRow[] = []
+  if (uniqueIds.length > 0) {
+    const withQuota = await supabase
+      .from('subscriptions')
+      .select('user_id, tier, status, monthly_session_allowance, sessions_remaining, quota_month')
+      .in('user_id', uniqueIds)
+    if (withQuota.error && isQuotaColumnError(withQuota.error)) {
+      const fallback = await supabase
         .from('subscriptions')
         .select('user_id, tier, status')
         .in('user_id', uniqueIds)
-    : {
-        data: [] as Array<{ user_id: string; tier: string; status: string }>
-      }
+      subscriptions = fallback.data ?? []
+    } else {
+      subscriptions = withQuota.data ?? []
+    }
+  }
 
   const subByUserId = new Map<string, { tier: string; status: string }>()
   ;(subscriptions ?? []).forEach((s) => subByUserId.set(s.user_id, { tier: s.tier, status: s.status }))
@@ -304,6 +321,9 @@ export default async function AdminDashboard() {
 
       <section className="mt-10">
         <h2 className="mb-3 text-base font-semibold text-zinc-100">Manage subscriptions</h2>
+        <p className="mb-3 text-sm text-zinc-500">
+          Set tier, status, and how many sessions each athlete gets this month. Bookings deduct from the remaining count.
+        </p>
         <Card>
           <CardContent className="p-6">
             <SubscriptionManagerForm athletes={athletes ?? []} subscriptions={subscriptions ?? []} />

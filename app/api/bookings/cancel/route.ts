@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { cancelBookingSchema, parseBody } from '@/lib/security/validation'
+import { createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
+import { isBookedInCurrentQuotaMonth, refundSessionQuota } from '@/lib/session-quota'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -25,7 +27,13 @@ export async function POST(request: Request) {
   }
   const { sessionId } = parsed.data
 
-  // Update existing booking to cancelled (re-booking is allowed due to upsert on athlete_id+session_id).
+  const { data: existing } = await supabase
+    .from('bookings')
+    .select('status, booked_at')
+    .eq('athlete_id', user.id)
+    .eq('session_id', sessionId)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('bookings')
     .update({ status: 'cancelled' })
@@ -33,6 +41,13 @@ export async function POST(request: Request) {
     .eq('session_id', sessionId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (existing?.status === 'booked' && isBookedInCurrentQuotaMonth(existing.booked_at)) {
+    const admin = createAdminClientOrNull()
+    if (admin) {
+      await refundSessionQuota(admin, user.id, 1)
+    }
+  }
 
   return NextResponse.json({ ok: true })
 }

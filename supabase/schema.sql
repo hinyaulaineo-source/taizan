@@ -643,6 +643,12 @@ alter table public.subscriptions
   add column if not exists stripe_customer_id text,
   add column if not exists stripe_subscription_id text;
 
+-- Monthly session quota (see supabase/migrations/20261102010000_subscription_session_quota.sql)
+alter table public.subscriptions
+  add column if not exists monthly_session_allowance integer not null default 8,
+  add column if not exists sessions_remaining integer not null default 8,
+  add column if not exists quota_month date not null default (date_trunc('month', timezone('Asia/Hong_Kong', now())))::date;
+
 create table if not exists public.session_reminder_sent (
   id uuid primary key default gen_random_uuid(),
   session_id uuid not null references public.sessions(id) on delete cascade,

@@ -53,7 +53,8 @@ STRIPE_WEBHOOK_SECRET=
 # Comma-separated Stripe Price IDs allowed from the client(e.g. price_xxx,price_yyy)
 STRIPE_PRICE_ALLOWLIST=
 
-# Optional: session reminder emails(`GET /api/cron/session-reminders`)
+# Optional: session reminder emails (`GET /api/cron/session-reminders`)
+# Session quotas also renew on that daily cron; or call GET /api/cron/session-quota-renew
 RESEND_API_KEY=
 RESEND_FROM_EMAIL="TrackZAN <onboarding@resend.dev>"
 

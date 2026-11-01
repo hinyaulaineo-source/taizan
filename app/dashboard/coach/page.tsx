@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { WorkoutProgressBar, WorkoutProgressRing } from '@/components/ui/workout-progress'
 import { Calendar, type CalendarEvent } from '@/components/ui/calendar'
+import SessionQuotaEditor from '@/components/dashboard/SessionQuotaEditor'
+import { isQuotaColumnError } from '@/lib/session-quota'
 
 export default async function CoachDashboard() {
   const supabase = await createClient()
@@ -40,6 +42,31 @@ export default async function CoachDashboard() {
     .eq('role', 'athlete')
     .eq('primary_coach_id', user.id)
     .order('full_name', { ascending: true })
+
+  const assignedAthleteIds = (assignedAthletes ?? []).map((a) => a.id)
+  let assignedSubs: Array<{
+    user_id: string
+    tier: string
+    status: string
+    monthly_session_allowance?: number | null
+    sessions_remaining?: number | null
+    quota_month?: string | null
+  }> = []
+  if (assignedAthleteIds.length > 0) {
+    const withQuota = await supabase
+      .from('subscriptions')
+      .select('user_id, tier, status, monthly_session_allowance, sessions_remaining, quota_month')
+      .in('user_id', assignedAthleteIds)
+    if (withQuota.error && isQuotaColumnError(withQuota.error)) {
+      const fallback = await supabase
+        .from('subscriptions')
+        .select('user_id, tier, status')
+        .in('user_id', assignedAthleteIds)
+      assignedSubs = fallback.data ?? []
+    } else {
+      assignedSubs = withQuota.data ?? []
+    }
+  }
 
   const assignedIds = new Set((assignedAthletes ?? []).map((a) => a.id))
 
@@ -266,6 +293,17 @@ export default async function CoachDashboard() {
           </div>
         )}
       </section>
+
+      {(assignedAthletes?.length ?? 0) > 0 ? (
+        <section className="mt-10">
+          <h2 className="mb-3 text-base font-semibold text-foreground">Monthly session quotas</h2>
+          <Card>
+            <CardContent className="p-6">
+              <SessionQuotaEditor athletes={assignedAthletes ?? []} subscriptions={assignedSubs} />
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="mt-10">
         <h2 className="mb-3 text-base font-semibold text-foreground">
