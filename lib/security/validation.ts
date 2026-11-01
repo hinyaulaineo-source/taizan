@@ -55,6 +55,14 @@ export const signupSchema = z
     path: ['phone'],
   })
 
+/** Email or registered full name + phone/password or registered name. */
+export const passwordSignInSchema = z
+  .object({
+    identifier: safeString(320).min(1),
+    secret: safeString(200).min(1),
+  })
+  .strict()
+
 /** Owner-only: create athlete / parent / coach with phone as sign-in password. */
 export const adminAccountCreateSchema = z
   .object({

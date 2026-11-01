@@ -2,16 +2,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { formatSignInError } from '@/lib/auth/sign-in-error'
-import { normalizePhoneDigits } from '@/lib/phone-auth'
-import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [identifier, setIdentifier] = useState('')
+  const [secret, setSecret] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [passwordResetOk, setPasswordResetOk] = useState(false)
-  const supabase = createClient()
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
@@ -19,34 +16,30 @@ export default function LoginPage() {
   }, [])
 
   async function handleLogin() {
-    const trimmedEmail = email.trim()
-    if (!trimmedEmail || !password.trim()) {
-      setError('Enter your email and password.')
+    const trimmedId = identifier.trim()
+    const trimmedSecret = secret.trim()
+    if (!trimmedId || !trimmedSecret) {
+      setError('Enter your email or name, and your password or name.')
       return
     }
     setLoading(true)
     setError('')
     try {
-      const trimmedPw = password.trim()
-      const digitPw = normalizePhoneDigits(trimmedPw)
-      const candidates = [...new Set([trimmedPw, digitPw].filter(Boolean))]
-      let lastErr: { message: string } | null = null
-      for (const pw of candidates) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: trimmedEmail,
-          password: pw,
-        })
-        if (!signInError) {
-          window.location.replace('/dashboard')
-          return
+      const res = await fetch('/api/auth/sign-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: trimmedId, secret: trimmedSecret }),
+      })
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) {
+        const rawMessage = data?.error
+        if (process.env.NODE_ENV === 'development' && rawMessage) {
+          console.error('Sign-in error:', rawMessage)
         }
-        lastErr = signInError
+        setError(formatSignInError(rawMessage))
+        return
       }
-      const rawMessage = lastErr?.message
-      if (process.env.NODE_ENV === 'development' && rawMessage) {
-        console.error('Sign-in error:', rawMessage)
-      }
-      setError(formatSignInError(rawMessage))
+      window.location.replace('/dashboard')
     } catch (err) {
       if (process.env.NODE_ENV === 'development') {
         console.error('Sign-in exception:', err)
@@ -95,12 +88,15 @@ export default function LoginPage() {
         ) : null}
 
         <div style={{ marginBottom: '12px' }}>
-          <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Email</label>
+          <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '6px' }}>
+            Email or full name
+          </label>
           <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
+            type="text"
+            autoComplete="username"
+            value={identifier}
+            onChange={e => setIdentifier(e.target.value)}
+            placeholder="you@example.com or your registered name"
             style={{
               width: '100%',
               padding: '10px 12px',
@@ -115,17 +111,20 @@ export default function LoginPage() {
         </div>
 
         <div style={{ marginBottom: '20px' }}>
-          <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '6px' }}>Password</label>
+          <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '6px' }}>
+            Password or full name
+          </label>
           <p style={{ color: '#555', fontSize: '11px', marginBottom: '6px', lineHeight: 1.4 }}>
-            For most accounts this is your registered phone number (digits). If you used &quot;Forgot password&quot;
-            to set a custom password, enter that instead.
+            Use your phone number (digits), a custom password, or your registered full name. You can also
+            sign in with name + email.
           </p>
           <input
             type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Phone digits or your password"
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            autoComplete="current-password"
+            value={secret}
+            onChange={e => setSecret(e.target.value)}
+            placeholder="Phone, password, or your full name"
+            onKeyDown={e => e.key === 'Enter' && void handleLogin()}
             style={{
               width: '100%',
               padding: '10px 12px',
