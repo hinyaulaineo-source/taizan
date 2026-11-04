@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { formatHkDateTime, formatHkDayMonth } from '@/lib/hk-date'
 import {
   CartesianGrid,
   Line,
@@ -59,6 +60,11 @@ export default function TrainingProgressionChart({ logs }: { logs: TrainingLogCh
   const metricLabel = metric === 'duration' ? 'Time (seconds)' : 'Running %'
   const metricUnit = metric === 'duration' ? 's' : '%'
   const [selectedDistance, setSelectedDistance] = useState<number | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (logs.length === 0) {
     return (
@@ -120,17 +126,15 @@ export default function TrainingProgressionChart({ logs }: { logs: TrainingLogCh
               {activeGroup.distanceMeters}m · {metricLabel} trend
             </p>
             <div className="h-[220px] w-full min-w-0">
+              {!mounted ? (
+                <div className="h-full w-full rounded-md bg-muted/30" aria-hidden />
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={activeGroup.points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis
                     dataKey="loggedAt"
-                    tickFormatter={(v) =>
-                      new Date(v as string).toLocaleDateString('en-GB', {
-                        month: 'short',
-                        day: 'numeric',
-                      })
-                    }
+                    tickFormatter={(v) => formatHkDayMonth(v as string)}
                     tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                     stroke="var(--border)"
                   />
@@ -152,16 +156,7 @@ export default function TrainingProgressionChart({ logs }: { logs: TrainingLogCh
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
-                    labelFormatter={(v) =>
-                      new Date(v as string).toLocaleString('en-GB', {
-                        weekday: 'short',
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    }
+                    labelFormatter={(v) => formatHkDateTime(v as string)}
                     formatter={(value) => {
                       const n = typeof value === 'number' ? value : Number(value)
                       const display =
@@ -181,6 +176,7 @@ export default function TrainingProgressionChart({ logs }: { logs: TrainingLogCh
                   />
                 </LineChart>
               </ResponsiveContainer>
+              )}
             </div>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeRole } from '@/lib/auth/roles'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { bookingSchema, parseBody } from '@/lib/security/validation'
 import { adminEnvMissingResponse, createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
@@ -22,8 +23,10 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'athlete') {
-    return NextResponse.json({ error: 'Only athletes can book sessions.' }, { status: 403 })
+  const role = normalizeRole(profile?.role)
+  const isOwner = role === 'owner'
+  if (role !== 'athlete' && !isOwner) {
+    return NextResponse.json({ error: 'Only athletes or owners can book sessions.' }, { status: 403 })
   }
 
   const rawBody = await safeJsonParse(request)
@@ -36,16 +39,6 @@ export async function POST(request: Request) {
   }
   const { sessionId } = parsed.data
 
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('tier, status')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!subscription || subscription.status !== 'active') {
-    return NextResponse.json({ error: 'Active subscription required.' }, { status: 403 })
-  }
-
   const { data: session } = await supabase
     .from('sessions')
     .select('id, status, allowed_tiers, max_athletes')
@@ -56,9 +49,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Session is not available.' }, { status: 404 })
   }
 
-  const allowedTiers = (session.allowed_tiers ?? []) as string[]
-  if (!allowedTiers.includes(subscription.tier)) {
-    return NextResponse.json({ error: 'This session is not available for your tier.' }, { status: 403 })
+  if (!isOwner) {
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('tier, status')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!subscription || subscription.status !== 'active') {
+      return NextResponse.json({ error: 'Active subscription required.' }, { status: 403 })
+    }
+
+    const allowedTiers = (session.allowed_tiers ?? []) as string[]
+    if (!allowedTiers.includes(subscription.tier)) {
+      return NextResponse.json({ error: 'This session is not available for your tier.' }, { status: 403 })
+    }
   }
 
   const { data: existingBooking } = await supabase
@@ -83,30 +88,46 @@ export async function POST(request: Request) {
     }
   }
 
-  const admin = createAdminClientOrNull()
-  if (!admin) return adminEnvMissingResponse()
+  let remaining: number | undefined
+  if (!isOwner) {
+    const admin = createAdminClientOrNull()
+    if (!admin) return adminEnvMissingResponse()
 
-  const consumed = await consumeSessionQuota(admin, user.id, 1)
-  if (!consumed.ok) {
-    return NextResponse.json(
-      { error: consumed.error ?? 'No monthly sessions remaining.', remaining: consumed.remaining },
-      { status: 403 },
+    const consumed = await consumeSessionQuota(admin, user.id, 1)
+    if (!consumed.ok) {
+      return NextResponse.json(
+        { error: consumed.error ?? 'No monthly sessions remaining.', remaining: consumed.remaining },
+        { status: 403 },
+      )
+    }
+    remaining = consumed.remaining
+
+    const { error } = await supabase.from('bookings').upsert(
+      {
+        athlete_id: user.id,
+        session_id: session.id,
+        status: 'booked',
+      },
+      { onConflict: 'athlete_id,session_id' },
     )
+
+    if (error) {
+      await refundSessionQuota(admin, user.id, 1)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+  } else {
+    const { error } = await supabase.from('bookings').upsert(
+      {
+        athlete_id: user.id,
+        session_id: session.id,
+        status: 'booked',
+      },
+      { onConflict: 'athlete_id,session_id' },
+    )
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
   }
 
-  const { error } = await supabase.from('bookings').upsert(
-    {
-      athlete_id: user.id,
-      session_id: session.id,
-      status: 'booked',
-    },
-    { onConflict: 'athlete_id,session_id' },
-  )
-
-  if (error) {
-    await refundSessionQuota(admin, user.id, 1)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ ok: true, remaining: consumed.remaining })
+  return NextResponse.json({ ok: true, remaining })
 }

@@ -1,19 +1,21 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
+import { monthName } from '@/lib/hk-date'
 
 const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
-function getLocalDateKey(d: Date) {
-  // YYYY-MM-DD in local time
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
+function splitDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return { year, month, day }
+}
+
+function toDateKey(year: number, month: number, day: number) {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
 const CalendarDay: React.FC<{
@@ -35,13 +37,20 @@ const CalendarDay: React.FC<{
   }
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`col-span-1 row-span-1 flex h-8 w-8 items-center justify-center ${base} ${cellBg} border border-transparent hover:border-border`}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onClick?.()
+        }
+      }}
+      className={`col-span-1 row-span-1 flex h-8 w-8 cursor-pointer items-center justify-center ${base} ${cellBg} border border-transparent hover:border-border`}
     >
       <span className="font-black text-sm">{day}</span>
-    </button>
+    </div>
   )
 }
 
@@ -52,6 +61,7 @@ export type CalendarEvent = {
   isBooked?: boolean
   canBook?: boolean
   bookHref?: string
+  sessionHref?: string
   cancel?: { href: string; body?: any; label?: string }
 }
 
@@ -59,23 +69,22 @@ export function Calendar({
   events = [],
   bookingLink = '/dashboard',
   weeklyLink,
-  initialMonth = new Date(),
+  monthlyLink,
+  initialDateKey,
 }: {
   events?: CalendarEvent[]
   bookingLink?: string
   weeklyLink?: string
-  initialMonth?: Date
+  monthlyLink?: string
+  initialDateKey: string
 }) {
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
-  const [visibleMonth, setVisibleMonth] = useState(initialMonth)
-  const [selectedDateKey, setSelectedDateKey] = useState(getLocalDateKey(initialMonth))
+  const initial = splitDateKey(initialDateKey)
+  const [visibleYear, setVisibleYear] = useState(initial.year)
+  const [visibleMonth, setVisibleMonth] = useState(initial.month)
+  const [selectedDateKey, setSelectedDateKey] = useState(initialDateKey)
   const [cancelLoadingSessionId, setCancelLoadingSessionId] = useState<string | null>(null)
   const [cancelError, setCancelError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const activeEventMap = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()
@@ -87,16 +96,14 @@ export function Calendar({
     return map
   }, [events])
 
-  const firstDayOfWeek = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1).getDay()
-  const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate()
-  const currentMonthLabel = visibleMonth.toLocaleString('default', { month: 'long' })
-  const currentYear = visibleMonth.getFullYear()
-
+  const firstDayOfWeek = new Date(Date.UTC(visibleYear, visibleMonth - 1, 1)).getUTCDay()
+  const daysInMonth = new Date(Date.UTC(visibleYear, visibleMonth, 0)).getUTCDate()
   const selectedEvents = activeEventMap.get(selectedDateKey) ?? []
 
-  // Avoid server/client locale-timezone mismatch during hydration.
-  if (!mounted) {
-    return <div className="rounded-[24px] border border-border bg-card p-5 text-sm text-muted-foreground">Loading calendar...</div>
+  const shiftMonth = (delta: number) => {
+    const next = new Date(visibleYear, visibleMonth - 1 + delta, 1)
+    setVisibleYear(next.getFullYear())
+    setVisibleMonth(next.getMonth() + 1)
   }
 
   const renderCalendarDays = () => {
@@ -109,8 +116,7 @@ export function Calendar({
         .fill(null)
         .map((_, i) => {
           const dayNumber = i + 1
-          const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), dayNumber)
-          const key = getLocalDateKey(date)
+          const key = toDateKey(visibleYear, visibleMonth, dayNumber)
           const dayEvents = activeEventMap.get(key) ?? []
           const isBooked = dayEvents.some((e) => e.isBooked)
           const isActive = dayEvents.length > 0
@@ -132,17 +138,38 @@ export function Calendar({
     <div className="rounded-[24px] border border-border bg-card p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-lg md:text-2xl font-semibold text-foreground">TrackZAN Master Calendar</h2>
-          <p className="mt-1 text-xs md:text-sm text-muted-foreground">
-            Click a day to see sessions. Colors: indigo = sessions available, green = booked.
-          </p>
-          <div className="mt-3 flex gap-2">
+          {monthlyLink ? (
+            <Link
+              href={monthlyLink}
+              className="group inline-flex flex-col text-left transition hover:opacity-90"
+            >
+              <h2 className="text-lg font-semibold text-foreground underline-offset-4 group-hover:underline md:text-2xl">
+                TrackZAN Master Calendar
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground md:text-sm">
+                Open the full monthly schedule. Colors: indigo = sessions available, green = booked.
+              </p>
+            </Link>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold text-foreground md:text-2xl">TrackZAN Master Calendar</h2>
+              <p className="mt-1 text-xs text-muted-foreground md:text-sm">
+                Click a day to see sessions. Colors: indigo = sessions available, green = booked.
+              </p>
+            </>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button asChild className="bg-white text-zinc-800 hover:bg-zinc-200">
               <Link href={bookingLink}>Book Now</Link>
             </Button>
             {weeklyLink ? (
               <Button asChild variant="outline" className="text-foreground">
                 <Link href={weeklyLink}>Weekly View</Link>
+              </Button>
+            ) : null}
+            {monthlyLink ? (
+              <Button asChild variant="outline" className="text-foreground">
+                <Link href={monthlyLink}>Monthly View</Link>
               </Button>
             ) : null}
           </div>
@@ -152,7 +179,7 @@ export function Calendar({
           <div className="flex items-center gap-2">
             <p className="text-sm text-foreground">
               <span className="font-medium">
-                {currentMonthLabel}, {currentYear}
+                {monthName(visibleMonth)} {visibleYear}
               </span>
             </p>
             <span className="h-1 w-1 rounded-full bg-muted-foreground/70" />
@@ -167,7 +194,15 @@ export function Calendar({
       <div className="mt-6">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-medium text-foreground">Selected: {selectedDateKey}</p>
-          <Button variant="ghost" className="text-foreground" onClick={() => setVisibleMonth(new Date())}>
+          <Button
+            variant="ghost"
+            className="text-foreground"
+            onClick={() => {
+              setVisibleYear(initial.year)
+              setVisibleMonth(initial.month)
+              setSelectedDateKey(initialDateKey)
+            }}
+          >
             Today
           </Button>
         </div>
@@ -181,8 +216,17 @@ export function Calendar({
               .sort((a, b) => Number(!!a.isBooked) - Number(!!b.isBooked))
               .map((ev) => (
                 <div key={ev.sessionId} className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background/50 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{ev.title}</p>
+                  <div className="min-w-0">
+                    {ev.sessionHref ? (
+                      <Link
+                        href={ev.sessionHref}
+                        className="text-sm font-semibold text-foreground underline-offset-2 hover:underline"
+                      >
+                        {ev.title}
+                      </Link>
+                    ) : (
+                      <p className="text-sm font-semibold text-foreground">{ev.title}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">{ev.isBooked ? 'Booked' : 'Available'}</p>
                   </div>
                   {ev.isBooked && ev.cancel ? (
@@ -237,18 +281,14 @@ export function Calendar({
           <Button
             variant="outline"
             className="border-border text-foreground"
-            onClick={() =>
-              setVisibleMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
-            }
+            onClick={() => shiftMonth(-1)}
           >
             Prev
           </Button>
           <Button
             variant="outline"
             className="border-border text-foreground"
-            onClick={() =>
-              setVisibleMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
-            }
+            onClick={() => shiftMonth(1)}
           >
             Next
           </Button>
@@ -257,4 +297,3 @@ export function Calendar({
     </div>
   )
 }
-

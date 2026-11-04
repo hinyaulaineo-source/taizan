@@ -13,6 +13,7 @@ import AccountManager from './AccountManager'
 import CoachManager from './CoachManager'
 import CreateAccountForm from './CreateAccountForm'
 import ChangePasswordForm from '@/components/dashboard/ChangePasswordForm'
+import { formatHkDate } from '@/lib/hk-date'
 
 export const dynamic = 'force-dynamic'
 
@@ -131,7 +132,7 @@ export default async function AdminDashboard() {
   const pendingSessionsByCreatedDate = (() => {
     const groups = new Map<string, typeof pendingSessions>()
     ;(pendingSessions ?? []).forEach((s) => {
-      const key = s.created_at ? new Date(s.created_at).toLocaleDateString() : 'Unknown date'
+      const key = s.created_at ? formatHkDate(s.created_at) : 'Unknown date'
       const arr = groups.get(key) ?? []
       arr.push(s)
       groups.set(key, arr)
@@ -187,7 +188,7 @@ export default async function AdminDashboard() {
                       <div>
                         <p className="text-sm font-semibold text-zinc-100">{session.title}</p>
                         <p className="text-xs text-zinc-500">
-                          {session.session_type} · {new Date(session.scheduled_at).toLocaleDateString()}
+                          {session.session_type} · {formatHkDate(session.scheduled_at)}
                         </p>
                       </div>
                       <ApprovalButtons sessionId={session.id} />

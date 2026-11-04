@@ -7,7 +7,9 @@ import { redirect } from 'next/navigation'
 import { WorkoutProgressBar, WorkoutProgressRing } from '@/components/ui/workout-progress'
 import { Calendar, type CalendarEvent } from '@/components/ui/calendar'
 import SessionQuotaEditor from '@/components/dashboard/SessionQuotaEditor'
-import { isQuotaColumnError } from '@/lib/session-quota'
+import { currentQuotaMonthISO, isQuotaColumnError } from '@/lib/session-quota'
+import { formatHkDate, hkDateParts } from '@/lib/hk-date'
+import CoachSessionList from './CoachSessionList'
 
 export default async function CoachDashboard() {
   const supabase = await createClient()
@@ -128,27 +130,6 @@ export default async function CoachDashboard() {
 
   const totalCoachSessions = coachSessionIds.size || 1
 
-  const sessionsByBatch = (() => {
-    const groups = new Map<string, typeof sessions>()
-    ;(sessions ?? []).forEach((s) => {
-      const key = s.created_at ?? 'unknown'
-      const arr = groups.get(key) ?? []
-      arr.push(s)
-      groups.set(key, arr)
-    })
-    return Array.from(groups.entries()).map(([key, group]) => {
-      const first = group![0]
-      const title = first.title ?? 'Untitled'
-      const date = key !== 'unknown'
-        ? new Date(key).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-        : 'Unknown date'
-      const label = group!.length > 1
-        ? `${title} — ${group!.length} sessions (${date})`
-        : `${title} (${date})`
-      return { key, label, group: group! }
-    })
-  })()
-
   return (
     <main>
       <h1 className="text-2xl font-semibold text-foreground">Coach Dashboard</h1>
@@ -182,117 +163,35 @@ export default async function CoachDashboard() {
       <section className="mt-8">
         <h2 className="mb-3 text-base font-semibold text-foreground">Master calendar</h2>
         <Calendar
-          events={(() => {
-            const dateKeyFromScheduledAt = (scheduledAt: string) => {
-              const d = new Date(scheduledAt)
-              const yyyy = d.getFullYear()
-              const mm = String(d.getMonth() + 1).padStart(2, '0')
-              const dd = String(d.getDate()).padStart(2, '0')
-              return `${yyyy}-${mm}-${dd}`
-            }
-
-            return (sessions ?? []).map(
-              (s): CalendarEvent => ({
-                dateKey: dateKeyFromScheduledAt(s.scheduled_at),
-                sessionId: s.id,
-                title: `${s.title} (${s.status})`,
-                isBooked: s.status === 'published',
-                canBook: false,
-              }),
-            )
-          })()}
+          events={(sessions ?? []).map(
+            (s): CalendarEvent => ({
+              dateKey: hkDateParts(s.scheduled_at).dateKey,
+              sessionId: s.id,
+              title: `${s.title} (${s.status})`,
+              isBooked: s.status === 'published',
+              canBook: false,
+            }),
+          )}
           bookingLink="/dashboard/coach/new-session"
           weeklyLink="/dashboard/coach/weekly"
-          initialMonth={new Date()}
+          monthlyLink="/dashboard/coach/monthly"
+          initialDateKey={hkDateParts(new Date()).dateKey}
         />
       </section>
 
-      <section className="mt-8">
-        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-base font-semibold text-foreground">My sessions</h2>
-          <div className="flex gap-2">
-            <Link
-              href="/dashboard/coach/feedback"
-              className="rounded-md border border-border px-3 py-2 text-sm text-foreground hover:bg-accent"
-            >
-              + Add feedback
-            </Link>
-            <Link
-              href="/dashboard/coach/new-session"
-              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
-              + New session
-            </Link>
-          </div>
-        </div>
-
-        {sessions?.length === 0 && (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">No sessions yet. Create your first one.</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {sessionsByBatch.length > 0 && (
-          <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1">
-            {sessionsByBatch.map(({ key, label, group }) => (
-              <div key={key}>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    {label}
-                  </p>
-                  {group.length > 1 ? (
-                    <Link
-                      href={`/dashboard/coach/edit-session/${group[0].id}?batch=1`}
-                      className="rounded-md border border-border px-2.5 py-1 text-[11px] text-foreground hover:bg-accent"
-                    >
-                      Edit batch
-                    </Link>
-                  ) : null}
-                </div>
-                {group.map((session) => (
-                  <Card key={session.id} className="mb-2">
-                    <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{session.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {session.session_type} · {new Date(session.scheduled_at).toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          tone={
-                            session.status === 'published'
-                              ? 'success'
-                              : session.status === 'pending'
-                                ? 'warning'
-                                : 'neutral'
-                          }
-                        >
-                          {session.status}
-                        </Badge>
-                        <Link
-                          href={`/dashboard/coach/check-in/${session.id}`}
-                          className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent"
-                        >
-                          Check-in
-                        </Link>
-                        <Link
-                          href={`/dashboard/coach/edit-session/${session.id}`}
-                          className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-accent"
-                        >
-                          Edit
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <CoachSessionList
+        currentMonth={currentQuotaMonthISO().slice(0, 7)}
+        sessions={(sessions ?? []).map((s) => ({
+          id: s.id,
+          title: s.title,
+          session_type: s.session_type,
+          status: s.status,
+          created_at: s.created_at,
+          monthKey: hkDateParts(s.scheduled_at).monthKey,
+          dateLabel: formatHkDate(s.scheduled_at),
+          createdLabel: s.created_at ? formatHkDate(s.created_at) : 'Unknown date',
+        }))}
+      />
 
       {(assignedAthletes?.length ?? 0) > 0 ? (
         <section className="mt-10">
@@ -348,7 +247,7 @@ export default async function CoachDashboard() {
                           <WorkoutProgressRing value={pct} />
                           {a.last_feedback_at ? (
                             <Badge tone="neutral">
-                              Last: {new Date(a.last_feedback_at).toLocaleDateString('en-GB')}
+                              Last: {formatHkDate(a.last_feedback_at)}
                             </Badge>
                           ) : (
                             <Badge tone="warning">No feedback yet</Badge>
@@ -398,7 +297,7 @@ export default async function CoachDashboard() {
                       <WorkoutProgressRing value={pct} />
                       {a.last_feedback_at ? (
                         <Badge tone="neutral">
-                          Last: {new Date(a.last_feedback_at).toLocaleDateString('en-GB')}
+                          Last: {formatHkDate(a.last_feedback_at)}
                         </Badge>
                       ) : (
                         <Badge tone="warning">No feedback yet</Badge>

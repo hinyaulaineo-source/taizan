@@ -16,6 +16,9 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
         )}
         ref={ref}
         {...props}
+        suppressHydrationWarning={
+          type === 'date' || type === 'time' || type === 'datetime-local' || props.suppressHydrationWarning
+        }
       />
     )
   },

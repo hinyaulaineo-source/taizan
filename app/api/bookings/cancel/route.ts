@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { normalizeRole } from '@/lib/auth/roles'
 import { applyRateLimit, safeJsonParse } from '@/lib/security/api-handler'
 import { cancelBookingSchema, parseBody } from '@/lib/security/validation'
 import { createAdminClientOrNull } from '@/lib/supabase/admin-helpers'
@@ -16,6 +17,12 @@ export async function POST(request: Request) {
 
   const limited = applyRateLimit(request, 'api', user.id)
   if (limited) return limited
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const role = normalizeRole(profile?.role)
+  if (role !== 'athlete' && role !== 'owner') {
+    return NextResponse.json({ error: 'Only athletes or owners can cancel bookings.' }, { status: 403 })
+  }
 
   const rawBody = await safeJsonParse(request)
   if (rawBody === '__TOO_LARGE__') {

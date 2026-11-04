@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -10,11 +11,16 @@ interface NavItem {
 
 export default function SidebarNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <nav className="space-y-1">
       {items.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+        const active = mounted && (pathname === item.href || pathname.startsWith(`${item.href}/`))
         return (
           <Link
             key={item.href}

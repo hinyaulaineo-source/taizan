@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isAthleteRole } from '@/lib/auth/roles'
 import BulkBookingForm from './BulkBookingForm'
 import { effectiveQuota } from '@/lib/session-quota'
+import { hkDateParts } from '@/lib/hk-date'
 
 export default async function AthleteBulkBookPage() {
   const supabase = await createClient()
@@ -61,6 +62,7 @@ export default async function AthleteBulkBookPage() {
       location: s.location,
       isBooked: bookedIds.has(s.id),
       created_at: s.created_at,
+      dateKey: hkDateParts(s.scheduled_at).dateKey,
     }))
 
   return (
@@ -76,7 +78,7 @@ export default async function AthleteBulkBookPage() {
           : ''}
       </p>
       <div className="mt-6">
-        <BulkBookingForm sessions={sessions} />
+        <BulkBookingForm sessions={sessions} initialDateKey={hkDateParts(new Date()).dateKey} />
       </div>
     </main>
   )

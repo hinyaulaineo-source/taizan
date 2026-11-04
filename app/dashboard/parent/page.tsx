@@ -10,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { Calendar, type CalendarEvent } from '@/components/ui/calendar'
+import { formatHkDate, formatHkDateTime, hkDateParts } from '@/lib/hk-date'
 import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
 
 export default async function ParentDashboard() {
@@ -135,7 +136,7 @@ export default async function ParentDashboard() {
                   <li key={s.id}>
                     {s.title}{' '}
                     <span className="text-muted-foreground">
-                      · {new Date(s.scheduled_at).toLocaleString()}
+                      · {formatHkDateTime(s.scheduled_at)}
                     </span>
                   </li>
                 ))}
@@ -146,13 +147,7 @@ export default async function ParentDashboard() {
 
         <Calendar
           events={(() => {
-            const dateKeyFromScheduledAt = (scheduledAt: string) => {
-              const d = new Date(scheduledAt)
-              const yyyy = d.getFullYear()
-              const mm = String(d.getMonth() + 1).padStart(2, '0')
-              const dd = String(d.getDate()).padStart(2, '0')
-              return `${yyyy}-${mm}-${dd}`
-            }
+            const dateKeyFromScheduledAt = (scheduledAt: string) => hkDateParts(scheduledAt).dateKey
 
             const athleteNameById = new Map<string, string>()
             ;(links ?? []).forEach((l: any) => {
@@ -230,7 +225,8 @@ export default async function ParentDashboard() {
           })()}
           bookingLink="/dashboard/parent/book"
           weeklyLink="/dashboard/parent/weekly"
-          initialMonth={new Date()}
+          monthlyLink="/dashboard/parent/monthly"
+          initialDateKey={hkDateParts(new Date()).dateKey}
         />
       </section>
 
@@ -240,7 +236,7 @@ export default async function ParentDashboard() {
           <h2 className="mt-2 text-2xl font-bold text-foreground">Today's Session</h2>
           {firstPublished ? (
             <p className="mt-2 text-sm text-foreground">
-              {firstPublished.title} · {new Date(firstPublished.scheduled_at).toLocaleString()}
+              {firstPublished.title} · {formatHkDateTime(firstPublished.scheduled_at)}
             </p>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">No published sessions yet.</p>
@@ -268,7 +264,7 @@ export default async function ParentDashboard() {
               }`}
             >
               <p className="mb-1 text-[11px] text-muted-foreground">
-                {f.sessions?.title} · {new Date(f.created_at).toLocaleDateString()}
+                {f.sessions?.title} · {formatHkDate(f.created_at)}
               </p>
               <p>{f.content}</p>
             </div>

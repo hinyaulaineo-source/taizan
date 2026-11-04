@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import DateTimeInput, { DateInput } from '@/components/ui/date-time-input'
 import SessionAthleteBooker from '@/components/coach/SessionAthleteBooker'
+import { applyHkTimeToIso, hkDateTimeInputToIso } from '@/lib/hk-date'
 
 export default function EditSessionForm({
   sessionId,
@@ -67,6 +68,27 @@ export default function EditSessionForm({
     }))
   }
 
+  async function upsertProgram(targetSessionId: string, content: string, userId: string) {
+    const { data: existingProgram } = await supabase
+      .from('programs')
+      .select('id')
+      .eq('session_id', targetSessionId)
+      .maybeSingle()
+
+    if (existingProgram?.id) {
+      return supabase
+        .from('programs')
+        .update({ content_md: content, updated_at: new Date().toISOString() })
+        .eq('id', existingProgram.id)
+    }
+
+    return supabase.from('programs').insert({
+      session_id: targetSessionId,
+      content_md: content,
+      created_by: userId,
+    })
+  }
+
   async function handleSubmit() {
     if (!form.title || !form.scheduled_at) {
       setError('Please fill in title and date.')
@@ -84,110 +106,95 @@ export default function EditSessionForm({
     setLoading(true)
     setError('')
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/login')
-      return
-    }
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
 
-    const iso = new Date(form.scheduled_at).toISOString()
-    const allowedTiers = form.single_tier_only ? [form.single_tier] : form.allowed_tiers
-    const baseUpdates = {
-      title: form.title,
-      description: form.description,
-      session_type: form.session_type,
-      location: form.location,
-      allowed_tiers: allowedTiers,
-      max_athletes: form.max_athletes ? Number(form.max_athletes) : null,
-    }
+      let iso: string
+      try {
+        iso = hkDateTimeInputToIso(form.scheduled_at)
+      } catch {
+        setError('Please choose a valid date and time.')
+        setLoading(false)
+        return
+      }
 
-    const sessionQuery = supabase.from('sessions').update(
-      applyToBatch
-        ? baseUpdates
-        : {
-            ...baseUpdates,
-            scheduled_at: iso,
-          },
-    )
+      const allowedTiers = form.single_tier_only ? [form.single_tier] : form.allowed_tiers
+      const baseUpdates = {
+        title: form.title,
+        description: form.description,
+        session_type: form.session_type,
+        location: form.location,
+        allowed_tiers: allowedTiers,
+        max_athletes: form.max_athletes ? Number(form.max_athletes) : null,
+      }
 
-    const { error: sessionError } = applyToBatch
-      ? await sessionQuery.eq('created_by', initial.created_by).eq('created_at', initial.created_at)
-      : await sessionQuery.eq('id', sessionId)
+      const targetIds =
+        applyToBatch && batchSessionIds.length > 0 ? Array.from(new Set(batchSessionIds)) : [sessionId]
 
-    if (sessionError) {
-      setError(sessionError.message)
-      setLoading(false)
-      return
-    }
-
-    // Update or insert program if provided
-    if (form.program.trim().length > 0) {
-      if (applyToBatch) {
-        const { data: batchSessions, error: batchErr } = await supabase
+      if (applyToBatch && targetIds.length > 1) {
+        const { data: updatedRows, error: sessionError } = await supabase
           .from('sessions')
-          .select('id')
-          .eq('created_by', initial.created_by)
-          .eq('created_at', initial.created_at)
+          .update(baseUpdates)
+          .in('id', targetIds)
+          .select('id, scheduled_at')
 
-        if (batchErr) {
-          setError(batchErr.message)
+        if (sessionError) {
+          setError(sessionError.message)
+          setLoading(false)
+          return
+        }
+        if (!updatedRows || updatedRows.length === 0) {
+          setError('Save failed — no sessions were updated. Check your permissions and try again.')
           setLoading(false)
           return
         }
 
-        for (const s of batchSessions ?? []) {
-          const { data: existingProgram } = await supabase
-            .from('programs')
-            .select('id')
-            .eq('session_id', s.id)
-            .maybeSingle()
-
-          if (existingProgram?.id) {
-            const { error: programError } = await supabase
-              .from('programs')
-              .update({ content_md: form.program, updated_at: new Date().toISOString() })
-              .eq('id', existingProgram.id)
-            if (programError) {
-              setError(programError.message)
-              setLoading(false)
-              return
-            }
-          } else {
-            const { error: programError } = await supabase.from('programs').insert({
-              session_id: s.id,
-              content_md: form.program,
-              created_by: user.id,
-            })
-            if (programError) {
-              setError(programError.message)
+        // Keep each session's HK calendar date; apply the edited clock time to all.
+        if (form.scheduled_at !== initial.scheduled_at) {
+          for (const row of updatedRows) {
+            const nextIso = applyHkTimeToIso(row.scheduled_at, form.scheduled_at)
+            const { error: timeError } = await supabase
+              .from('sessions')
+              .update({ scheduled_at: nextIso })
+              .eq('id', row.id)
+            if (timeError) {
+              setError(timeError.message)
               setLoading(false)
               return
             }
           }
         }
       } else {
-        const { data: existingProgram } = await supabase
-        .from('programs')
-        .select('id')
-        .eq('session_id', sessionId)
-        .maybeSingle()
-
-        if (existingProgram?.id) {
-          const { error: programError } = await supabase
-            .from('programs')
-            .update({ content_md: form.program, updated_at: new Date().toISOString() })
-            .eq('id', existingProgram.id)
-          if (programError) {
-            setError(programError.message)
-            setLoading(false)
-            return
-          }
-        } else {
-          const { error: programError } = await supabase.from('programs').insert({
-            session_id: sessionId,
-            content_md: form.program,
-            created_by: user.id,
+        const { data: updatedRows, error: sessionError } = await supabase
+          .from('sessions')
+          .update({
+            ...baseUpdates,
+            scheduled_at: iso,
           })
+          .eq('id', sessionId)
+          .select('id')
+
+        if (sessionError) {
+          setError(sessionError.message)
+          setLoading(false)
+          return
+        }
+        if (!updatedRows || updatedRows.length === 0) {
+          setError('Save failed — session was not updated. Check your permissions and try again.')
+          setLoading(false)
+          return
+        }
+      }
+
+      if (form.program.trim().length > 0) {
+        for (const id of targetIds) {
+          const { error: programError } = await upsertProgram(id, form.program, user.id)
           if (programError) {
             setError(programError.message)
             setLoading(false)
@@ -195,35 +202,38 @@ export default function EditSessionForm({
           }
         }
       }
-    }
 
-    if (form.recurring && form.recurrence_end_date) {
-      const recurringRes = await fetch('/api/sessions/recurring', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description,
-          session_type: form.session_type,
-          start_at: iso,
-          end_date: form.recurrence_end_date,
-          location: form.location,
-          allowed_tiers: allowedTiers,
-          weekdays: form.weekdays,
-          program: form.program,
-          max_athletes: form.max_athletes ? Number(form.max_athletes) : null,
-        }),
-      })
-      if (!recurringRes.ok) {
-        const data = (await recurringRes.json().catch(() => null)) as { error?: string } | null
-        setError(data?.error ?? 'Failed to create recurring sessions.')
-        setLoading(false)
-        return
+      if (form.recurring && form.recurrence_end_date) {
+        const recurringRes = await fetch('/api/sessions/recurring', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: form.title,
+            description: form.description,
+            session_type: form.session_type,
+            start_at: iso,
+            end_date: form.recurrence_end_date,
+            location: form.location,
+            allowed_tiers: allowedTiers,
+            weekdays: form.weekdays,
+            program: form.program,
+            max_athletes: form.max_athletes ? Number(form.max_athletes) : null,
+          }),
+        })
+        if (!recurringRes.ok) {
+          const data = (await recurringRes.json().catch(() => null)) as { error?: string } | null
+          setError(data?.error ?? 'Failed to create recurring sessions.')
+          setLoading(false)
+          return
+        }
       }
-    }
 
-    router.push('/dashboard/coach')
-    router.refresh()
+      router.push('/dashboard/coach')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save session.')
+      setLoading(false)
+    }
   }
 
   async function handleDelete(allInBatch: boolean) {
@@ -235,81 +245,42 @@ export default function EditSessionForm({
     setDeleting(true)
     setError('')
 
-    const sessionDeleteQuery = supabase.from('sessions').delete()
-    const programDeleteQuery = supabase.from('programs').delete()
-    const bookingDeleteQuery = supabase.from('bookings').delete()
-    const feedbackDeleteQuery = supabase.from('feedback').delete()
+    const ids = allInBatch && batchSessionIds.length > 0 ? Array.from(new Set(batchSessionIds)) : [sessionId]
+    if (ids.length === 0) {
+      setDeleting(false)
+      router.push('/dashboard/coach')
+      router.refresh()
+      return
+    }
 
-    if (allInBatch) {
-      const { data: batchSessions, error: batchErr } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('created_by', initial.created_by)
-        .eq('created_at', initial.created_at)
-
-      if (batchErr) {
-        setError(batchErr.message)
-        setDeleting(false)
-        return
-      }
-
-      const ids = (batchSessions ?? []).map((s) => s.id)
-      if (ids.length === 0) {
-        setDeleting(false)
-        router.push('/dashboard/coach')
-        router.refresh()
-        return
-      }
-
-      const { error: bErr } = await bookingDeleteQuery.in('session_id', ids)
-      if (bErr) {
-        setError(bErr.message)
-        setDeleting(false)
-        return
-      }
-      const { error: fErr } = await feedbackDeleteQuery.in('session_id', ids)
-      if (fErr) {
-        setError(fErr.message)
-        setDeleting(false)
-        return
-      }
-      const { error: pErr } = await programDeleteQuery.in('session_id', ids)
-      if (pErr) {
-        setError(pErr.message)
-        setDeleting(false)
-        return
-      }
-      const { error: sErr } = await sessionDeleteQuery.in('id', ids)
-      if (sErr) {
-        setError(sErr.message)
-        setDeleting(false)
-        return
-      }
-    } else {
-      const { error: bErr } = await bookingDeleteQuery.eq('session_id', sessionId)
-      if (bErr) {
-        setError(bErr.message)
-        setDeleting(false)
-        return
-      }
-      const { error: fErr } = await feedbackDeleteQuery.eq('session_id', sessionId)
-      if (fErr) {
-        setError(fErr.message)
-        setDeleting(false)
-        return
-      }
-      const { error: pErr } = await programDeleteQuery.eq('session_id', sessionId)
-      if (pErr) {
-        setError(pErr.message)
-        setDeleting(false)
-        return
-      }
-      const { error: sErr } = await sessionDeleteQuery.eq('id', sessionId)
-      if (sErr) {
-        setError(sErr.message)
-        setDeleting(false)
-        return
-      }
+    const { error: bErr } = await supabase.from('bookings').delete().in('session_id', ids)
+    if (bErr) {
+      setError(bErr.message)
+      setDeleting(false)
+      return
+    }
+    const { error: fErr } = await supabase.from('feedback').delete().in('session_id', ids)
+    if (fErr) {
+      setError(fErr.message)
+      setDeleting(false)
+      return
+    }
+    const { error: pErr } = await supabase.from('programs').delete().in('session_id', ids)
+    if (pErr) {
+      setError(pErr.message)
+      setDeleting(false)
+      return
+    }
+    const { data: deletedRows, error: sErr } = await supabase.from('sessions').delete().in('id', ids).select('id')
+    if (sErr) {
+      setError(sErr.message)
+      setDeleting(false)
+      return
+    }
+    if (!deletedRows || deletedRows.length === 0) {
+      setError('Delete failed — no sessions were removed. Check your permissions and try again.')
+      setDeleting(false)
+      return
     }
 
     setDeleting(false)
@@ -326,16 +297,20 @@ export default function EditSessionForm({
     setCancelling(true)
     setError('')
 
-    const updateQuery = supabase
+    const ids = allInBatch && batchSessionIds.length > 0 ? Array.from(new Set(batchSessionIds)) : [sessionId]
+    const { data: updatedRows, error: updateErr } = await supabase
       .from('sessions')
       .update({ status: 'cancelled' })
-
-    const { error: updateErr } = allInBatch
-      ? await updateQuery.eq('created_by', initial.created_by).eq('created_at', initial.created_at)
-      : await updateQuery.eq('id', sessionId)
+      .in('id', ids)
+      .select('id')
 
     if (updateErr) {
       setError(updateErr.message)
+      setCancelling(false)
+      return
+    }
+    if (!updatedRows || updatedRows.length === 0) {
+      setError('Cancel failed — no sessions were updated. Check your permissions and try again.')
       setCancelling(false)
       return
     }
@@ -401,13 +376,20 @@ export default function EditSessionForm({
           onChange={(v) => setForm((f) => ({ ...f, scheduled_at: v }))}
         />
       </div>
-      <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+      <label style={{ ...labelStyle, display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '16px' }}>
         <input
           type="checkbox"
           checked={applyToBatch}
           onChange={(e) => setApplyToBatch(e.target.checked)}
+          disabled={batchSessionIds.length <= 1}
+          style={{ marginTop: '2px' }}
         />
-        Apply edits to all sessions created in this same batch (keeps each session date/time).
+        <span>
+          Apply edits to all {batchSessionIds.length} sessions in this batch
+          {batchSessionIds.length > 1
+            ? ' (keeps each session date; applies the time above to every session).'
+            : ' (only one session in this batch).'}
+        </span>
       </label>
 
       <label style={labelStyle}>Location</label>

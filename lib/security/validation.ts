@@ -55,7 +55,7 @@ export const signupSchema = z
     path: ['phone'],
   })
 
-/** Email or registered full name + phone/password or registered name. */
+/** Email or registered full name + phone/password. Full name is not a password. */
 export const passwordSignInSchema = z
   .object({
     identifier: safeString(320).min(1),

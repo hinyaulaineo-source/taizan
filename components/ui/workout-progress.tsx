@@ -1,8 +1,12 @@
 'use client'
 
+import { useId } from 'react'
+
 type ProgressProps = { value: number }
 
 export function WorkoutProgressRing({ value }: ProgressProps) {
+  const reactId = useId()
+  const gradId = `workout-grad-${reactId.replace(/:/g, '')}`
   const v = Math.max(0, Math.min(100, value))
   const radius = 44
   const circumference = 2 * Math.PI * radius
@@ -16,7 +20,7 @@ export function WorkoutProgressRing({ value }: ProgressProps) {
           cx="50"
           cy="50"
           r={radius}
-          stroke="url(#grad)"
+          stroke={`url(#${gradId})`}
           strokeWidth="8"
           strokeLinecap="round"
           fill="none"
@@ -25,7 +29,7 @@ export function WorkoutProgressRing({ value }: ProgressProps) {
           style={{ transition: 'stroke-dashoffset 300ms ease' }}
         />
         <defs>
-          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#ff2a3d" />
             <stop offset="100%" stopColor="#f4c95d" />
           </linearGradient>

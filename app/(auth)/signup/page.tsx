@@ -72,9 +72,33 @@ export default function SignupPage() {
           borderRadius: '16px',
         }}
       >
-        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '500', marginBottom: '8px' }}>
-          TrackZAN
-        </h1>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '12px',
+            marginBottom: '8px',
+          }}
+        >
+          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: '500', margin: 0 }}>
+            TrackZAN
+          </h1>
+          <Link
+            href="/"
+            style={{
+              color: '#aaa',
+              fontSize: '13px',
+              textDecoration: 'none',
+              border: '0.5px solid #333',
+              borderRadius: '8px',
+              padding: '6px 10px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Back to home
+          </Link>
+        </div>
         <p style={{ color: '#666', fontSize: '14px', marginBottom: '2rem' }}>
           Create your account to book sessions.
         </p>
@@ -195,10 +219,15 @@ export default function SignupPage() {
           {loading ? 'Creating...' : 'Sign up'}
         </button>
 
-        <p style={{ color: '#888', fontSize: '13px', marginTop: '14px' }}>
+        <p style={{ color: '#888', fontSize: '13px', marginTop: '14px', textAlign: 'center' }}>
           Already have an account?{' '}
-          <Link href="/login" style={{ color: '#fff', textDecoration: 'underline' }}>
+          <Link href="/?login=1" style={{ color: '#fff', textDecoration: 'underline' }}>
             Sign in
+          </Link>
+        </p>
+        <p style={{ color: '#666', fontSize: '13px', marginTop: '10px', textAlign: 'center' }}>
+          <Link href="/" style={{ color: '#aaa', textDecoration: 'underline' }}>
+            Exit to TrackZAN home
           </Link>
         </p>
       </div>

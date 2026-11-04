@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { formatHkDateTime } from '@/lib/hk-date'
 
 type TrainingRow = {
   id: string
@@ -155,14 +156,7 @@ export default function TrainingLogTable({ rows }: { rows: TrainingRow[] }) {
                   {isEditing ? (
                     <Input type="date" value={loggedAt} onChange={(e) => setLoggedAt(e.target.value)} />
                   ) : (
-                    new Date(row.logged_at).toLocaleString('en-GB', {
-                      weekday: 'short',
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
+                    formatHkDateTime(row.logged_at)
                   )}
                 </td>
                 <td className="px-3 py-2.5 tabular-nums text-foreground">

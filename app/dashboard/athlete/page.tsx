@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { canAccessAthleteDashboard, isAthleteRole, isOwnerLike, normalizeRole } from '@/lib/auth/roles'
 import { Calendar, type CalendarEvent } from '@/components/ui/calendar'
+import { formatHkDate, formatHkDateTime, hkDateParts } from '@/lib/hk-date'
 import { EmptyWorkoutState } from '@/components/ui/empty-workout-state'
 import MobileBottomNav from '@/components/dashboard/mobile-bottom-nav'
 import PersonalBestForm from './PersonalBestForm'
@@ -161,8 +162,8 @@ export default async function AthleteDashboard() {
     <main className="pb-20 md:pb-0">
       {ownerPreview && (
         <div className="mb-6 rounded-lg border border-amber-900/80 bg-amber-950/40 px-4 py-3 text-sm text-amber-100/90">
-          You’re viewing the athlete dashboard as an owner. Session list shows published sessions;
-          booking and cancellations are disabled. Sign in as an athlete to test the full flow.
+          You’re viewing the athlete dashboard as an owner. You can open every session, book, cancel,
+          and check in — nothing is locked in this view.
         </div>
       )}
       <div className="mb-8 flex items-start justify-between gap-4">
@@ -345,10 +346,7 @@ export default async function AthleteDashboard() {
                 <h2 className="mt-2 text-2xl font-bold text-foreground">{heading}</h2>
                 <p className="mt-2 text-sm text-foreground">
                   {nextSession.title} ·{' '}
-                  {new Date(nextSession.scheduled_at).toLocaleDateString('en-GB', {
-                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit',
-                  })}
+                  {formatHkDateTime(nextSession.scheduled_at)}
                 </p>
                 <a
                   href={`/dashboard/athlete/session/${nextSession.id}`}
@@ -372,13 +370,7 @@ export default async function AthleteDashboard() {
         <h2 className="mb-3 text-base font-semibold text-foreground">Calendar</h2>
         {(() => {
           const bookedSessionIds = new Set<string>((bookings ?? []).map((b: any) => (b.sessions as any)?.id).filter(Boolean))
-          const dateKeyFromScheduledAt = (scheduledAt: string) => {
-            const d = new Date(scheduledAt)
-            const yyyy = d.getFullYear()
-            const mm = String(d.getMonth() + 1).padStart(2, '0')
-            const dd = String(d.getDate()).padStart(2, '0')
-            return `${yyyy}-${mm}-${dd}`
-          }
+          const dateKeyFromScheduledAt = (scheduledAt: string) => hkDateParts(scheduledAt).dateKey
 
           const events: CalendarEvent[] = []
 
@@ -390,13 +382,12 @@ export default async function AthleteDashboard() {
               sessionId: s.id,
               title: s.title,
               isBooked,
-              canBook: !ownerPreview && subscriptionActive && !isBooked,
-              bookHref:
-                ownerPreview || isBooked ? undefined : `/dashboard/athlete/book/${s.id}`,
-              cancel:
-                ownerPreview || !isBooked
-                  ? undefined
-                  : { href: '/api/bookings/cancel', body: { sessionId: s.id } },
+              canBook: (ownerPreview || subscriptionActive) && !isBooked,
+              bookHref: isBooked ? undefined : `/dashboard/athlete/book/${s.id}`,
+              sessionHref: `/dashboard/athlete/session/${s.id}`,
+              cancel: !isBooked
+                ? undefined
+                : { href: '/api/bookings/cancel', body: { sessionId: s.id } },
             })
           })
 
@@ -411,13 +402,20 @@ export default async function AthleteDashboard() {
               title: s.title,
               isBooked: true,
               canBook: false,
-              cancel: ownerPreview
-                ? undefined
-                : { href: '/api/bookings/cancel', body: { sessionId: s.id } },
+              sessionHref: `/dashboard/athlete/session/${s.id}`,
+              cancel: { href: '/api/bookings/cancel', body: { sessionId: s.id } },
             })
           })
 
-          return <Calendar events={events} bookingLink="/dashboard/athlete/book" weeklyLink="/dashboard/athlete/weekly" initialMonth={new Date()} />
+          return (
+            <Calendar
+              events={events}
+              bookingLink="/dashboard/athlete/book"
+              weeklyLink="/dashboard/athlete/weekly"
+              monthlyLink="/dashboard/athlete/monthly"
+              initialDateKey={hkDateParts(new Date()).dateKey}
+            />
+          )
         })()}
       </section>
 
@@ -438,7 +436,7 @@ export default async function AthleteDashboard() {
                   <Link href={`/dashboard/athlete/session/${(b.sessions as any)?.id}`} className="block hover:opacity-90">
                     <p className="text-sm font-semibold text-foreground">{(b.sessions as any)?.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date((b.sessions as any)?.scheduled_at).toLocaleDateString()} · {b.status} · Tap for details
+                      {formatHkDate((b.sessions as any)?.scheduled_at)} · {b.status} · Tap for details
                     </p>
                   </Link>
                 </CardContent>
@@ -468,7 +466,7 @@ export default async function AthleteDashboard() {
               }`}
             >
               <p className="mb-1 text-[11px] text-muted-foreground">
-                {(f.sessions as any)?.title} · {new Date(f.created_at).toLocaleDateString()}
+                {(f.sessions as any)?.title} · {formatHkDate(f.created_at)}
               </p>
               <p>{f.content}</p>
             </div>

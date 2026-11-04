@@ -143,7 +143,11 @@ export default async function AthleteWeeklyViewPage({ searchParams }: PageProps)
                     return (
                       <Link
                         key={s.id}
-                        href={isBooked ? `/dashboard/athlete/session/${s.id}` : `/dashboard/athlete/book/${s.id}`}
+                        href={
+                          ownerPreview || isBooked
+                            ? `/dashboard/athlete/session/${s.id}`
+                            : `/dashboard/athlete/book/${s.id}`
+                        }
                         className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-3 transition hover:bg-accent/40"
                       >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-xs font-bold text-indigo-300">

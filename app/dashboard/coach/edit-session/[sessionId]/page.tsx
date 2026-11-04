@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
+import { isOwnerLike } from '@/lib/auth/roles'
 import { redirect } from 'next/navigation'
 import EditSessionForm from './EditSessionForm'
 import Link from 'next/link'
+import { toHkDateTimeInputValue } from '@/lib/hk-date'
 
 interface PageProps {
   params: Promise<{ sessionId: string }>
@@ -24,7 +26,7 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
     .eq('id', user.id)
     .single()
 
-  if (profile?.role !== 'coach' && profile?.role !== 'owner') redirect('/dashboard')
+  if (profile?.role !== 'coach' && !isOwnerLike(profile?.role)) redirect('/dashboard')
 
   const { data: session } = await supabase
     .from('sessions')
@@ -34,8 +36,7 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
 
   if (!session) redirect('/dashboard/coach')
 
-  // Let coach edit their own sessions (RLS should enforce, but UI should be clear)
-  if (profile?.role === 'coach' && session.created_by !== user.id) redirect('/dashboard/coach')
+  if (!isOwnerLike(profile?.role) && session.created_by !== user.id) redirect('/dashboard/coach')
 
   const { data: program } = await supabase
     .from('programs')
@@ -43,17 +44,14 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
     .eq('session_id', sessionId)
     .maybeSingle()
 
-  let batchSessionIds: string[] = [session.id]
-  if (batch === '1') {
-    const { data: batchSessions } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('created_by', session.created_by)
-      .eq('created_at', session.created_at)
-    if (batchSessions && batchSessions.length > 0) {
-      batchSessionIds = batchSessions.map((s) => s.id)
-    }
-  }
+  const { data: batchSessions } = await supabase
+    .from('sessions')
+    .select('id')
+    .eq('created_by', session.created_by)
+    .eq('created_at', session.created_at)
+
+  const batchSessionIds =
+    batchSessions && batchSessions.length > 0 ? batchSessions.map((s) => s.id) : [session.id]
 
   return (
     <main style={{ padding: '2rem', maxWidth: '600px', margin: '0 auto' }}>
@@ -61,7 +59,9 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
         <Link href="/dashboard/coach" style={{ color: '#888', fontSize: '14px', textDecoration: 'none' }}>
           ← Back
         </Link>
-        <h1 style={{ fontSize: '22px', fontWeight: '500' }}>Edit session</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '500' }}>
+          {batch === '1' || batchSessionIds.length > 1 ? 'Edit session batch' : 'Edit session'}
+        </h1>
       </div>
 
       <EditSessionForm
@@ -70,19 +70,18 @@ export default async function EditSessionPage({ params, searchParams }: PageProp
         initial={{
           id: session.id,
           title: session.title ?? '',
-          description: (session as any).description ?? '',
+          description: (session as { description?: string | null }).description ?? '',
           session_type: session.session_type ?? 'track_session',
-          scheduled_at: session.scheduled_at ? new Date(session.scheduled_at).toISOString().slice(0, 16) : '',
+          scheduled_at: session.scheduled_at ? toHkDateTimeInputValue(session.scheduled_at) : '',
           location: session.location ?? '',
           allowed_tiers: (session.allowed_tiers ?? []) as string[],
-          program: (program as any)?.content_md ?? '',
+          program: (program as { content_md?: string } | null)?.content_md ?? '',
           max_athletes: session.max_athletes,
           created_at: session.created_at,
           created_by: session.created_by,
         }}
-        initialApplyToBatch={batch === '1'}
+        initialApplyToBatch={batch === '1' && batchSessionIds.length > 1}
       />
     </main>
   )
 }
-

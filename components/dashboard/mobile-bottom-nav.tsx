@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { CalendarDays, Home, MessageCircle, User, Users } from 'lucide-react'
@@ -36,12 +37,17 @@ function getItems(role?: string): NavItem[] {
 export default function MobileBottomNav({ role }: { role?: string }) {
   const pathname = usePathname()
   const items = getItems(role)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/90 backdrop-blur-md md:hidden">
       <div className={`grid grid-cols-${items.length}`} style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
         {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          const active = mounted && (pathname === item.href || pathname.startsWith(`${item.href}/`))
           return (
             <Link
               key={item.href}

@@ -178,3 +178,40 @@
     @apply rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground;
   }
 }
+
+@keyframes marketing-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes marketing-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.marketing-hero-rise {
+  animation: marketing-hero-rise 700ms ease-out both;
+}
+
+.marketing-section {
+  animation: marketing-section-in 600ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-hero-rise,
+  .marketing-section {
+    animation: none;
+  }
+}

@@ -12,9 +12,16 @@ type SessionOption = {
   location: string | null
   isBooked: boolean
   created_at?: string | null
+  dateKey: string
 }
 
-export default function BulkBookingForm({ sessions }: { sessions: SessionOption[] }) {
+export default function BulkBookingForm({
+  sessions,
+  initialDateKey,
+}: {
+  sessions: SessionOption[]
+  initialDateKey: string
+}) {
   const router = useRouter()
   const [selected, setSelected] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
@@ -45,22 +52,17 @@ export default function BulkBookingForm({ sessions }: { sessions: SessionOption[
       timeZone: 'UTC',
     }).format(new Date(value))
 
-  const calendarEvents = useMemo<CalendarEvent[]>(() => {
-    const dateKeyFromScheduledAt = (scheduledAt: string) => {
-      const d = new Date(scheduledAt)
-      const yyyy = d.getFullYear()
-      const mm = String(d.getMonth() + 1).padStart(2, '0')
-      const dd = String(d.getDate()).padStart(2, '0')
-      return `${yyyy}-${mm}-${dd}`
-    }
-    return sessions.map((s) => ({
-      dateKey: dateKeyFromScheduledAt(s.scheduled_at),
-      sessionId: s.id,
-      title: `${s.title}${s.location ? ` · ${s.location}` : ''}`,
-      isBooked: s.isBooked,
-      canBook: !s.isBooked,
-    }))
-  }, [sessions])
+  const calendarEvents = useMemo<CalendarEvent[]>(
+    () =>
+      sessions.map((s) => ({
+        dateKey: s.dateKey,
+        sessionId: s.id,
+        title: `${s.title}${s.location ? ` · ${s.location}` : ''}`,
+        isBooked: s.isBooked,
+        canBook: !s.isBooked,
+      })),
+    [sessions],
+  )
 
   const sessionsByCreatedDate = useMemo(() => {
     const groups = new Map<string, SessionOption[]>()
@@ -98,7 +100,7 @@ export default function BulkBookingForm({ sessions }: { sessions: SessionOption[
 
   return (
     <div className="space-y-6">
-      <Calendar events={calendarEvents} bookingLink="/dashboard/athlete/book" initialMonth={new Date()} />
+      <Calendar events={calendarEvents} bookingLink="/dashboard/athlete/book" initialDateKey={initialDateKey} />
 
       <section>
         <h2 className="mb-3 text-base font-semibold text-zinc-100">Choose sessions to book</h2>

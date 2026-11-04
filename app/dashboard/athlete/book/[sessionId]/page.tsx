@@ -23,8 +23,8 @@ export default async function BookSessionPage({ params }: PageProps) {
     .eq('id', user.id)
     .single()
 
-  const previewOnly = isOwnerLike(profile?.role) && !isAthleteRole(profile?.role)
-  if (!isAthleteRole(profile?.role) && !previewOnly) redirect('/dashboard')
+  const ownerAccess = isOwnerLike(profile?.role) && !isAthleteRole(profile?.role)
+  if (!isAthleteRole(profile?.role) && !ownerAccess) redirect('/dashboard')
 
   const { data: subscription } = await supabase
     .from('subscriptions')
@@ -34,15 +34,25 @@ export default async function BookSessionPage({ params }: PageProps) {
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('id, title, session_type, location, scheduled_at, status, allowed_tiers, programs(*)')
+    .select('id, title, description, session_type, location, scheduled_at, status, allowed_tiers')
     .eq('id', sessionId)
     .single()
 
   if (!session || session.status !== 'published') redirect('/dashboard/athlete')
 
+  const { data: programRow } = await supabase
+    .from('programs')
+    .select('content_md')
+    .eq('session_id', sessionId)
+    .maybeSingle()
+
+  const description = (session.description ?? '').trim()
+  const programNotes = (programRow?.content_md ?? '').trim()
+
   const tier = subscription?.tier
   const active = subscription?.status === 'active'
-  const allowed = active && !!tier && ((session.allowed_tiers as string[]) ?? []).includes(tier)
+  const allowed =
+    ownerAccess || (active && !!tier && ((session.allowed_tiers as string[]) ?? []).includes(tier))
 
   const { data: existingBooking } = await supabase
     .from('bookings')
@@ -71,9 +81,24 @@ export default async function BookSessionPage({ params }: PageProps) {
         <p style={{ color: '#888', fontSize: '13px' }}>
           {session.session_type} · {new Date(session.scheduled_at).toLocaleString()} · {session.location}
         </p>
-        {(session.programs as any)?.content_md && (
-          <div style={{ marginTop: '12px', padding: '10px 12px', background: '#0a0a0a', borderRadius: '10px', fontSize: '12px', color: '#888', whiteSpace: 'pre-wrap' }}>
-            {(session.programs as any).content_md}
+        {(description || programNotes) && (
+          <div style={{ marginTop: '12px', padding: '10px 12px', background: '#0a0a0a', borderRadius: '10px' }}>
+            <p style={{ color: '#666', fontSize: '11px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              About this session
+            </p>
+            {description ? (
+              <p style={{ fontSize: '13px', color: '#ddd', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', marginBottom: programNotes ? '12px' : 0 }}>
+                {description}
+              </p>
+            ) : null}
+            {programNotes ? (
+              <>
+                <p style={{ color: '#666', fontSize: '11px', marginBottom: '6px' }}>Program / notes</p>
+                <p style={{ fontSize: '13px', color: '#ddd', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                  {programNotes}
+                </p>
+              </>
+            ) : null}
           </div>
         )}
       </div>
@@ -91,12 +116,17 @@ export default async function BookSessionPage({ params }: PageProps) {
         ) : null}
       </div>
 
+      {ownerAccess && (
+        <p style={{ color: '#a1a1aa', fontSize: '13px', marginBottom: '12px' }}>
+          Owner access: booking is unlocked without subscription limits.
+        </p>
+      )}
       {!allowed && (
         <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '1rem' }}>
           You cannot book this session. Make sure your subscription is active and tier-eligible.
         </p>
       )}
-      {allowed && !alreadyBooked && effectiveQuota(subscription).remaining <= 0 && (
+      {allowed && !ownerAccess && !alreadyBooked && effectiveQuota(subscription).remaining <= 0 && (
         <p style={{ color: '#f87171', fontSize: '13px', marginBottom: '1rem' }}>
           You have no monthly sessions left. Ask your coach or club owner if you need more this month.
         </p>
@@ -104,9 +134,12 @@ export default async function BookSessionPage({ params }: PageProps) {
 
       <BookingButton
         sessionId={session.id}
-        disabled={!allowed || alreadyBooked || (active && effectiveQuota(subscription).remaining <= 0)}
+        disabled={
+          !allowed ||
+          alreadyBooked ||
+          (!ownerAccess && active && effectiveQuota(subscription).remaining <= 0)
+        }
         alreadyBooked={alreadyBooked}
-        previewOnly={previewOnly}
       />
     </main>
   )
